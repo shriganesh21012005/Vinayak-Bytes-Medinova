@@ -1,18 +1,18 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/components/ui/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import NavigationHeader from '@/components/NavigationHeader';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SignUpSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -24,27 +24,34 @@ type SignUpFormValues = z.infer<typeof SignUpSchema>;
 
 const SignUp = () => {
   const { toast } = useToast();
+  const { register, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Sign Up - HealthCare";
+    document.title = "Sign Up - MediNova";
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) navigate('/', { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const form = useForm<SignUpFormValues>({
     resolver: zodResolver(SignUpSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: ""
-    }
+    defaultValues: { name: "", email: "", password: "" }
   });
 
-  const onSubmit = (data: SignUpFormValues) => {
-    console.log("Form submitted:", data);
-    toast({
-      title: "Account created!",
-      description: "Welcome to HealthCare! You have successfully signed up.",
-    });
-    // In a real application, here you would handle the API call to register the user
+  const onSubmit = async (data: SignUpFormValues) => {
+    try {
+      await register(data.name, data.email, data.password);
+      toast({ title: "Account created!", description: "Welcome to MediNova!" });
+      navigate('/', { replace: true });
+    } catch (err) {
+      toast({
+        title: "Registration failed",
+        description: err instanceof Error ? err.message : "Could not create account",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -130,9 +137,14 @@ const SignUp = () => {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full bg-medical hover:bg-medical-dark">
-                      Create Account
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button
+                      type="submit"
+                      className="w-full bg-medical hover:bg-medical-dark"
+                      disabled={form.formState.isSubmitting}
+                    >
+                      {form.formState.isSubmitting
+                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account...</>
+                        : <>Create Account <ArrowRight className="ml-2 h-4 w-4" /></>}
                     </Button>
                   </form>
                 </Form>

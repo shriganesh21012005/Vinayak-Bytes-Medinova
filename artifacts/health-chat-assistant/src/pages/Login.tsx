@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import NavigationHeader from '@/components/NavigationHeader';
+import { useAuth } from '@/contexts/AuthContext';
 
 const LoginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -22,26 +23,36 @@ type LoginFormValues = z.infer<typeof LoginSchema>;
 
 const Login = () => {
   const { toast } = useToast();
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/';
 
   useEffect(() => {
-    document.title = "Login - HealthCare";
+    document.title = "Login - MediNova";
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) navigate(from, { replace: true });
+  }, [isAuthenticated, navigate, from]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(LoginSchema),
-    defaultValues: {
-      email: "",
-      password: ""
-    }
+    defaultValues: { email: "", password: "" }
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    console.log("Login form submitted:", data);
-    toast({
-      title: "Login successful!",
-      description: "Welcome back to HealthCare!",
-    });
-    // In a real application, here you would handle API call to validate credentials
+  const onSubmit = async (data: LoginFormValues) => {
+    try {
+      await login(data.email, data.password);
+      toast({ title: "Welcome back!", description: "You have been logged in successfully." });
+      navigate(from, { replace: true });
+    } catch (err) {
+      toast({
+        title: "Login failed",
+        description: err instanceof Error ? err.message : "Invalid email or password",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -107,9 +118,14 @@ const Login = () => {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full bg-medical hover:bg-medical-dark">
-                      Login
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button
+                      type="submit"
+                      className="w-full bg-medical hover:bg-medical-dark"
+                      disabled={form.formState.isSubmitting}
+                    >
+                      {form.formState.isSubmitting
+                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Logging in...</>
+                        : <>Login <ArrowRight className="ml-2 h-4 w-4" /></>}
                     </Button>
                   </form>
                 </Form>
