@@ -1,0 +1,3 @@
+- [Mongoose async pre-save hook](mongoose-presave-hook.md) — async hooks must NOT call next(); just return
+- [Express trust proxy + rate limit](express-trust-proxy.md) — Replit proxy requires trust proxy=1 and rate-limit xForwardedForHeader validation disabled
+- [Auth architecture](auth-architecture.md) — JWT access (15min in memory) + refresh (7d httpOnly cookie at /api/auth), rotate-on-use, SHA-256 hash stored in MongoDB
