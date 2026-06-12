@@ -1,0 +1,209 @@
+Analyze the existing MediNova codebase and revise the implementation plan based on the following final product vision.
+
+IMPORTANT:
+
+- Do not redesign the UI.
+- Do not create a mobile app.
+- Reuse existing pages and components wherever possible.
+- Focus on backend architecture, AI integration, data flow, and implementation planning.
+- Do not write code yet.
+- Produce a detailed technical architecture and implementation plan first.
+- Wait for approval before making code changes.
+
+==================================================
+FINAL PRODUCT VISION
+==================================================
+
+MediNova is an AI-powered healthcare platform centered around a Personal Health Memory system.
+
+The core innovation is not a generic chatbot.
+
+The platform continuously converts healthcare interactions into structured healthcare intelligence that can be reused by both doctors and AI systems.
+
+The AI should answer using both:
+
+1. The user's current query
+2. The patient's accumulated healthcare history
+
+==================================================
+CORE FEATURE 1
+MEDISYNC HEALTH MEMORY
+==================================================
+
+Store and organize:
+
+- Prescriptions
+- Lab Reports
+- Medical Records
+- Appointments
+- Medication History
+- Doctor Consultation Notes
+
+Create a structured healthcare timeline for every patient.
+
+The system should maintain a patient-specific health memory that grows over time.
+
+==================================================
+CORE FEATURE 2
+INTELLIGENT HEALTH MEMORY ENGINE
+==================================================
+
+The platform should continuously analyze stored healthcare data and preserve medically important information.
+
+Examples of critical information:
+
+- Allergies
+- Chronic Diseases
+- Critical Surgeries
+- Medication Restrictions
+- Severe Drug Reactions
+- Emergency Medical Events
+- Long-Term Conditions
+
+The goal is to create a condensed lifelong health profile while reducing redundant healthcare data.
+
+This should be treated as a future-ready architecture component even if a simplified version is implemented initially.
+
+==================================================
+CORE FEATURE 3
+PRESCRIPTION INTELLIGENCE
+==================================================
+
+Workflow:
+
+Prescription Upload
+→ OCR Extraction
+→ AI Processing
+
+Return:
+
+- Medicines
+- Dosages
+- Frequency
+- Medication Warnings
+- Drug Interaction Alerts
+
+The system must never diagnose diseases.
+
+The system only explains prescription information.
+
+==================================================
+CORE FEATURE 4
+CLINICAL SUMMARY ENGINE
+==================================================
+
+Before a consultation, generate a doctor-facing patient summary.
+
+Include:
+
+- Major Allergies
+- Chronic Conditions
+- Important Medical Events
+- Medication History
+- Critical Health Risks
+- Important Restrictions
+
+Purpose:
+
+Reduce doctor review time and improve consultation quality.
+
+==================================================
+CORE FEATURE 5
+MULTILINGUAL HEALTHCARE ASSISTANT
+==================================================
+
+Supported languages:
+
+- English
+- Bengali
+- Hindi
+- Urdu
+
+Architecture:
+
+Voice Input
+→ Speech To Text
+→ Language Detection
+→ Translation To English
+→ AI Processing
+→ Translation Back To User Language
+→ Text To Speech
+
+The assistant must use Personal Health Memory when generating responses.
+
+The assistant must never:
+
+- Diagnose diseases
+- Prescribe medicines
+- Replace doctors
+
+==================================================
+CORE FEATURE 6
+RETRIEVAL-AUGMENTED PERSONAL HEALTH MEMORY
+==================================================
+
+Before generating any AI response:
+
+1. Retrieve relevant patient history.
+2. Retrieve relevant prescriptions.
+3. Retrieve medication history.
+4. Retrieve allergies and restrictions.
+5. Retrieve important medical events.
+
+The AI should generate responses using both patient context and user input.
+
+This is a key differentiator from generic AI chatbots.
+
+==================================================
+CORE FEATURE 7
+PRIVACY & SECURITY
+==================================================
+
+Research and propose the best practical implementation for:
+
+- Encryption of healthcare records
+- Secure storage
+- Patient privacy
+- Protection from unauthorized access
+
+Evaluate MongoDB Atlas features including:
+
+- Field Level Encryption
+- Access Controls
+- Secure Data Storage
+
+Recommend realistic implementation options for a hackathon MVP.
+
+==================================================
+HEALTHCARE SAFETY RULES
+==================================================
+
+The assistant must:
+
+- Never provide diagnosis
+- Never prescribe medicines
+- Never claim to be a doctor
+- Escalate serious symptoms to professional care
+- Display healthcare disclaimers when necessary
+
+==================================================
+REQUEST
+==================================================
+
+Before implementation:
+
+1. Analyze the current frontend.
+2. Identify reusable pages and components.
+3. Design database schemas.
+4. Design API routes.
+5. Design backend folder structure.
+6. Design AI workflow.
+7. Design OCR workflow.
+8. Design Personal Health Memory workflow.
+9. Design security architecture.
+10. Identify required environment variables.
+11. Propose implementation phases ordered by hackathon impact and development effort.
+
+Do not write code yet.
+
+Wait for approval before implementation.
