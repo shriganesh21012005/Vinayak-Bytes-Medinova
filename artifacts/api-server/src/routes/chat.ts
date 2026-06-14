@@ -4,7 +4,7 @@ import { requireAuth, type AuthRequest } from "../middlewares/auth";
 import { ChatConversation } from "../models/ChatConversation";
 import { ChatMessage } from "../models/ChatMessage";
 import { HealthMemory } from "../models/HealthMemory";
-import { generateMockStream } from "../lib/mockAiGenerator";
+import { generateStream, type ChatHistoryMessage } from "../lib/aiProvider";
 
 const router = Router();
 
@@ -43,34 +43,56 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       conversation = await ChatConversation.create({ userId: userOid });
     }
 
+    // Save user message first
     await ChatMessage.create({
       conversationId: conversation._id,
       role: "user",
       content: trimmed,
     });
 
+    // Load recent conversation history for AI context (last 10 exchanges).
+    // We fetch 11 descending, reverse to chronological, then drop the last
+    // entry (the user message we just saved) so we pass only prior turns.
+    const recentDocs = await ChatMessage.find(
+      {
+        conversationId: conversation._id,
+        role: { $in: ["user", "assistant"] },
+      },
+      { role: 1, content: 1, createdAt: 1 }
+    )
+      .sort({ createdAt: -1 })
+      .limit(11)
+      .lean();
+
+    const history: ChatHistoryMessage[] = recentDocs
+      .reverse()
+      .slice(0, -1)
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+
     const memory = await HealthMemory.findOne({ userId: userOid });
 
     let fullContent = "";
 
-    for await (const chunk of generateMockStream(trimmed, memory)) {
+    for await (const chunk of generateStream(trimmed, memory, history)) {
       if (chunk.type === "chunk" && chunk.content) {
         fullContent += chunk.content;
         send(chunk);
       } else if (chunk.type === "done") {
-        await ChatMessage.create({
-          conversationId: conversation._id,
-          role: "assistant",
-          content: fullContent,
-        });
+        if (fullContent) {
+          await ChatMessage.create({
+            conversationId: conversation._id,
+            role: "assistant",
+            content: fullContent,
+          });
 
-        await ChatConversation.updateOne(
-          { _id: conversation._id },
-          {
-            $inc: { messageCount: 2 },
-            $set: { lastMessageAt: new Date() },
-          }
-        );
+          await ChatConversation.updateOne(
+            { _id: conversation._id },
+            {
+              $inc: { messageCount: 2 },
+              $set: { lastMessageAt: new Date() },
+            }
+          );
+        }
 
         send({ type: "done" });
       }

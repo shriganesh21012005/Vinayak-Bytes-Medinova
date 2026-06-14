@@ -1,0 +1,131 @@
+PHASE 4 — STAGE 1 ONLY
+
+IMPORTANT:
+
+Analyze the existing MediNova codebase before making changes.
+
+Do NOT implement OpenAI, GPT, Gemini, Anthropic, or any external AI provider.
+
+Do NOT require OPENAI_API_KEY.
+
+Do NOT begin Stage 2.
+
+==================================================
+GOAL
+==================================================
+
+Build the complete Phase 4 architecture using a temporary mock AI generator.
+
+The objective is to fully implement and test the chat infrastructure before connecting a real LLM.
+
+==================================================
+IMPLEMENT NOW
+==================================================
+
+Backend:
+
+1. ChatConversation model
+   - One conversation per user initially
+   - Linked to authenticated user
+
+2. ChatMessage model
+   - role (user / assistant / system)
+   - content
+   - timestamps
+   - conversationId
+
+3. Chat Persistence
+   - Save every user message
+   - Save every assistant message
+   - Load recent history
+
+4. Health Context Retrieval
+   - Retrieve HealthMemory
+   - Retrieve Doctor Summary
+   - Retrieve recent chat history
+
+5. Context Builder
+   Build a unified context object containing:
+   - Health Memory
+   - Doctor Summary
+   - Recent Messages
+   - Current User Query
+
+6. Safety Layer
+   Enforce:
+   - No diagnosis
+   - No prescriptions
+   - No claiming to be a doctor
+   - Escalate emergencies
+   - Healthcare disclaimer support
+
+7. Chat API Routes
+
+   POST /api/chat/message
+
+   GET /api/chat/history
+
+   GET /api/chat/context
+
+8. SSE Streaming Framework
+
+   Implement server-side streaming architecture.
+
+   Even though responses are mock-generated,
+   stream tokens exactly as future GPT responses will be streamed.
+
+==================================================
+FRONTEND
+==================================================
+
+Reuse existing ChatAssistant component.
+
+Replace local generateResponse() logic.
+
+Connect to backend APIs.
+
+Support:
+
+- Message persistence
+- Loading chat history
+- Live SSE streaming
+- Typing indicators
+- Error handling
+- Authenticated requests
+
+Do not redesign the UI.
+
+==================================================
+MOCK AI
+==================================================
+
+Create a temporary mock response generator.
+
+It should generate responses using:
+
+- User message
+- Health Memory
+- Doctor Summary
+
+This is only for architecture validation.
+
+No external AI provider.
+
+==================================================
+TESTING
+==================================================
+
+After implementation:
+
+1. Verify conversation persistence.
+2. Verify chat history reload.
+3. Verify Health Memory retrieval.
+4. Verify SSE streaming.
+5. Verify safety layer behavior.
+6. Verify frontend integration.
+
+Produce a complete implementation report.
+
+Do not begin Stage 2.
+
+Wait for approval before replacing the mock generator with GPT-4o-mini.
