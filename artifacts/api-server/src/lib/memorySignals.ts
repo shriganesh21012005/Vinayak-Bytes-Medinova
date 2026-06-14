@@ -27,10 +27,24 @@ function matchAll(text: string, patterns: RegExp[]): string[] {
 // Use [ \t] instead of \s so patterns never cross line boundaries.
 // The "m" flag added in matchAll makes $ match end-of-line.
 const ALLERGY_PATS = [
+  // "Allergy: X" / "Allergies: X" / "Allergic: X"
+  /allerg(?:y|ies|ic)?[ \t]*[:\-][ \t]*([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "allergic to X"
   /allerg(?:ic|y|ies)[ \t]+to[ \t]+([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "Known Allergy / Known Allergies: X"
+  /known[ \t]+allerg(?:y|ies)[ \t]*[:\-]?[ \t]*([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "Drug Allergy: X"
   /drug[ \t]+allergy[ \t]*[:\-][ \t]*([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "hypersensitive to X" / "sensitivity to X"
   /hypersensitive[ \t]+to[ \t]+([\w][\w \t,]*?)(?:\.|,|;|$)/i,
   /sensitivity[ \t]+to[ \t]+([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "ADR: X" (Adverse Drug Reaction)
+  /\bADR[ \t]*[:\-][ \t]*([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "adverse (drug) reaction: X"
+  /adverse[ \t]+(?:drug[ \t]+)?reaction[ \t]*[:\-][ \t]*([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // "intolerant to X" / "intolerance to X"
+  /intoleran(?:t|ce)[ \t]+to[ \t]+([\w][\w \t,]*?)(?:\.|,|;|$)/i,
+  // NKDA / no known drug allergies
   /(NKDA|no[ \t]+known[ \t]+drug[ \t]+allerg(?:y|ies))/i,
 ];
 

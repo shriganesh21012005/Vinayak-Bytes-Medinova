@@ -113,15 +113,21 @@ const ChatAssistant = () => {
     }
 
     setInputMessage('');
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setMessages(prev => [...prev, { role: 'user', content: text }, { role: 'assistant', content: '' }]);
     setIsLoading(true);
 
     const token = await getToken();
     if (!token) {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: "Your session has expired. Please sign in again to continue." },
-      ]);
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'assistant' && last.content === '') {
+          updated[updated.length - 1] = { role: 'assistant', content: "Your session has expired. Please sign in again to continue." };
+        } else {
+          updated.push({ role: 'assistant', content: "Your session has expired. Please sign in again to continue." });
+        }
+        return updated;
+      });
       setIsLoading(false);
       return;
     }
@@ -148,7 +154,6 @@ const ChatAssistant = () => {
 
       setIsLoading(false);
       setIsStreaming(true);
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -352,12 +357,12 @@ const ChatAssistant = () => {
                             message.role === 'user'
                               ? 'bg-blue-600 text-white rounded-tr-sm'
                               : 'bg-white text-gray-900 border border-gray-200 shadow-sm rounded-tl-sm',
-                            isStreaming && index === messages.length - 1 && message.role === 'assistant' && message.content === ''
+                            (isLoading || isStreaming) && index === messages.length - 1 && message.role === 'assistant' && message.content === ''
                               ? 'min-w-[48px] min-h-[32px]'
                               : ''
                           )}
                         >
-                          {isStreaming && index === messages.length - 1 && message.role === 'assistant' && message.content === '' ? (
+                          {(isLoading || isStreaming) && index === messages.length - 1 && message.role === 'assistant' && message.content === '' ? (
                             <div className="flex space-x-1 items-center h-4">
                               {[0, 0.2, 0.4].map((delay) => (
                                 <motion.div
@@ -375,29 +380,6 @@ const ChatAssistant = () => {
                       </motion.div>
                     ))}
 
-                    {isLoading && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-start gap-2"
-                      >
-                        <Avatar className="h-7 w-7 mt-0.5 flex-shrink-0">
-                          <AvatarFallback className="bg-blue-600 text-white text-xs">MN</AvatarFallback>
-                        </Avatar>
-                        <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2 border border-gray-200 shadow-sm">
-                          <div className="flex space-x-1 items-center h-4">
-                            {[0, 0.2, 0.4].map((delay) => (
-                              <motion.div
-                                key={delay}
-                                animate={{ scale: [0.8, 1.2, 0.8] }}
-                                transition={{ repeat: Infinity, duration: 0.9, delay }}
-                                className="h-1.5 w-1.5 rounded-full bg-blue-400"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
                     <div ref={messagesEndRef} />
                   </AnimatePresence>
                 </div>
