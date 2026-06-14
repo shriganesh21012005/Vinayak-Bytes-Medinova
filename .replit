@@ -76,6 +76,7 @@ externalPort = 3001
 
 [userenv.shared]
 ENABLE_OPENAI = "false"
+AI_PROVIDER = "mock"
 
 [nix]
 channel = "stable-25_05"
