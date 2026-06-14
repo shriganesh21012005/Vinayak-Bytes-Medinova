@@ -24,10 +24,6 @@ args = "API Server"
 task = "workflow.run"
 args = "Start application"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Dev Proxy (19579→5000)"
-
 [[workflows.workflow]]
 name = "API Server"
 author = "agent"
@@ -52,18 +48,6 @@ task = "shell.exec"
 args = "node scripts/start-frontend.mjs"
 waitForPort = 5000
 
-[[workflows.workflow]]
-name = "Dev Proxy (19579→5000)"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node scripts/dev-proxy.mjs"
-waitForPort = 19579
-
-[workflows.workflow.metadata]
-outputType = "console"
-
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
@@ -79,6 +63,10 @@ externalPort = 80
 [[ports]]
 localPort = 8080
 externalPort = 8080
+
+[[ports]]
+localPort = 19579
+externalPort = 3001
 
 [userenv]
 
