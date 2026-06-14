@@ -11,6 +11,7 @@ export interface IMedicationItem {
   name: string;
   dosage?: string;
   frequency?: string;
+  confidence: "verified" | "unverified";
   sourceRecordIds: mongoose.Types.ObjectId[];
   firstSeenAt: Date;
   lastSeenAt: Date;
@@ -24,6 +25,7 @@ export interface IHealthMemory extends Document {
   medicationRestrictions: IMemoryItem[];
   criticalEvents: IMemoryItem[];
   currentMedications: IMedicationItem[];
+  unverifiedMedications: IMedicationItem[];
   condensedProfile: string;
   lastUpdatedByRecord?: mongoose.Types.ObjectId;
   recordCount: number;
@@ -46,6 +48,7 @@ const MedicationItemSchema = new Schema<IMedicationItem>(
     name: { type: String, required: true },
     dosage: String,
     frequency: String,
+    confidence: { type: String, enum: ["verified", "unverified"], required: true, default: "verified" },
     sourceRecordIds: [{ type: Schema.Types.ObjectId }],
     firstSeenAt: { type: Date, required: true },
     lastSeenAt: { type: Date, required: true },
@@ -62,6 +65,7 @@ const HealthMemorySchema = new Schema<IHealthMemory>(
     medicationRestrictions: { type: [MemoryItemSchema], default: [] },
     criticalEvents: { type: [MemoryItemSchema], default: [] },
     currentMedications: { type: [MedicationItemSchema], default: [] },
+    unverifiedMedications: { type: [MedicationItemSchema], default: [] },
     condensedProfile: { type: String, default: "" },
     lastUpdatedByRecord: { type: Schema.Types.ObjectId },
     recordCount: { type: Number, default: 0 },

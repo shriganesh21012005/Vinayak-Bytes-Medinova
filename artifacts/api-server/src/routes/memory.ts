@@ -2,6 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { requireAuth, type AuthRequest } from "../middlewares/auth";
 import { HealthMemory } from "../models/HealthMemory";
+import { rebuildHealthMemoryForUser } from "../lib/healthMemoryEngine";
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.get("/memory", requireAuth, async (req: AuthRequest, res) => {
       medicationRestrictions: [],
       criticalEvents: [],
       currentMedications: [],
+      unverifiedMedications: [],
       condensedProfile: "",
       recordCount: 0,
       lastUpdatedAt: null,
@@ -38,10 +40,30 @@ router.get("/memory", requireAuth, async (req: AuthRequest, res) => {
     medicationRestrictions: memory.medicationRestrictions,
     criticalEvents: memory.criticalEvents,
     currentMedications: memory.currentMedications,
+    unverifiedMedications: memory.unverifiedMedications,
     condensedProfile: memory.condensedProfile,
     recordCount: memory.recordCount,
     lastUpdatedAt: memory.updatedAt,
   });
+});
+
+router.post("/memory/rebuild", requireAuth, async (req: AuthRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  try {
+    const result = await rebuildHealthMemoryForUser(req.user.userId);
+    res.json({
+      success: true,
+      recordsProcessed: result.recordsProcessed,
+      skipped: result.skipped,
+    });
+  } catch (err) {
+    console.error("[memory/rebuild] failed:", err);
+    res.status(500).json({ error: "Rebuild failed. Please try again." });
+  }
 });
 
 router.get("/memory/doctor-summary", requireAuth, async (req: AuthRequest, res) => {
@@ -59,6 +81,7 @@ router.get("/memory/doctor-summary", requireAuth, async (req: AuthRequest, res) 
       majorAllergies: [],
       chronicConditions: [],
       currentMedications: [],
+      unverifiedMedications: [],
       importantEvents: [],
       restrictions: [],
       criticalRisks: [],
@@ -86,6 +109,16 @@ router.get("/memory/doctor-summary", requireAuth, async (req: AuthRequest, res) 
     name: m.name,
     dosage: m.dosage ?? null,
     frequency: m.frequency ?? null,
+    confidence: m.confidence,
+    sourceCount: m.sourceRecordIds.length,
+    lastSeen: m.lastSeenAt,
+  }));
+
+  const unverifiedMedications = memory.unverifiedMedications.map(m => ({
+    name: m.name,
+    dosage: m.dosage ?? null,
+    frequency: m.frequency ?? null,
+    confidence: m.confidence,
     sourceCount: m.sourceRecordIds.length,
     lastSeen: m.lastSeenAt,
   }));
@@ -113,6 +146,7 @@ router.get("/memory/doctor-summary", requireAuth, async (req: AuthRequest, res) 
     majorAllergies,
     chronicConditions,
     currentMedications,
+    unverifiedMedications,
     importantEvents,
     restrictions,
     criticalRisks,

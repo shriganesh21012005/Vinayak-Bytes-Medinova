@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Brain, AlertTriangle, Activity, Pill, Syringe,
-  ShieldAlert, Zap, FileText, RefreshCw, Upload,
+  ShieldAlert, Zap, FileText, RefreshCw, Upload, CheckCircle, HelpCircle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NavigationHeader from '@/components/NavigationHeader';
@@ -26,6 +26,7 @@ interface MedicationItem {
   name: string;
   dosage: string | null;
   frequency: string | null;
+  confidence: 'verified' | 'unverified';
   sourceCount?: number;
   lastSeen?: string;
   sourceRecordIds?: string[];
@@ -41,6 +42,7 @@ interface HealthMemoryData {
   medicationRestrictions: MemoryItem[];
   criticalEvents: MemoryItem[];
   currentMedications: MedicationItem[];
+  unverifiedMedications: MedicationItem[];
   condensedProfile: string;
   recordCount: number;
   lastUpdatedAt: string | null;
@@ -66,16 +68,6 @@ const SECTION_CONFIG = [
     border: 'border-blue-500/20',
     badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
     emptyText: 'No chronic conditions documented',
-  },
-  {
-    key: 'currentMedications' as const,
-    label: 'Current Medications',
-    icon: Pill,
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/20',
-    badgeClass: 'bg-green-500/20 text-green-300 border-green-500/30',
-    emptyText: 'No medications documented',
   },
   {
     key: 'surgeries' as const,
@@ -109,6 +101,71 @@ const SECTION_CONFIG = [
   },
 ];
 
+function MemoryItemCard({
+  item,
+  bg,
+  border,
+}: {
+  item: MemoryItem;
+  bg: string;
+  border: string;
+}) {
+  const count = item.sourceRecordIds?.length ?? item.sourceCount;
+  return (
+    <div className={`p-3 rounded-lg ${bg} border ${border}`}>
+      <p className="text-sm text-white">{item.value}</p>
+      {count != null && count > 0 && (
+        <p className="text-xs text-white/30 mt-1">Seen in {count} record(s)</p>
+      )}
+    </div>
+  );
+}
+
+function MedicationCard({
+  med,
+  bg,
+  border,
+}: {
+  med: MedicationItem;
+  bg: string;
+  border: string;
+}) {
+  const count = med.sourceRecordIds?.length ?? med.sourceCount;
+  const isVerified = med.confidence === 'verified';
+
+  return (
+    <div className={`p-3 rounded-lg ${bg} border ${border} space-y-1.5`}>
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-medium text-white flex-1">{med.name}</p>
+        {isVerified ? (
+          <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+            <CheckCircle className="h-3 w-3" />
+            verified
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+            <HelpCircle className="h-3 w-3" />
+            unverified
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {med.dosage && (
+          <span className="text-xs px-2 py-0.5 rounded bg-medical/10 text-medical border border-medical/20">
+            {med.dosage}
+          </span>
+        )}
+        {med.frequency && (
+          <span className="text-xs text-white/50">{med.frequency}</span>
+        )}
+      </div>
+      {count != null && count > 0 && (
+        <p className="text-xs text-white/30">Seen in {count} record(s)</p>
+      )}
+    </div>
+  );
+}
+
 function SectionCard({
   icon: Icon,
   label,
@@ -118,7 +175,6 @@ function SectionCard({
   badgeClass,
   emptyText,
   items,
-  isMedications,
 }: {
   icon: React.ElementType;
   label: string;
@@ -127,8 +183,7 @@ function SectionCard({
   border: string;
   badgeClass: string;
   emptyText: string;
-  items: (MemoryItem | MedicationItem)[];
-  isMedications?: boolean;
+  items: MemoryItem[];
 }) {
   return (
     <Card className="glass-card border border-white/10 overflow-hidden">
@@ -148,43 +203,65 @@ function SectionCard({
           <p className="text-xs text-white/40 italic">{emptyText}</p>
         ) : (
           <div className="space-y-2">
-            {isMedications
-              ? (items as MedicationItem[]).map((med, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg ${bg} border ${border} space-y-1`}
-                  >
-                    <p className="text-sm font-medium text-white">{med.name}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {med.dosage && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-medical/10 text-medical border border-medical/20">
-                          {med.dosage}
-                        </span>
-                      )}
-                      {med.frequency && (
-                        <span className="text-xs text-white/50">{med.frequency}</span>
-                      )}
-                    </div>
-                    {(med.sourceRecordIds?.length || med.sourceCount) && (
-                      <p className="text-xs text-white/30">
-                        Seen in {med.sourceRecordIds?.length ?? med.sourceCount} record(s)
-                      </p>
-                    )}
-                  </div>
-                ))
-              : (items as MemoryItem[]).map((item, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg ${bg} border ${border}`}
-                  >
-                    <p className="text-sm text-white">{item.value}</p>
-                    {(item.sourceRecordIds?.length || item.sourceCount) && (
-                      <p className="text-xs text-white/30 mt-1">
-                        Seen in {item.sourceRecordIds?.length ?? item.sourceCount} record(s)
-                      </p>
-                    )}
-                  </div>
+            {items.map((item, i) => (
+              <MemoryItemCard key={i} item={item} bg={bg} border={border} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MedicationsCard({
+  currentMedications,
+  unverifiedMedications,
+}: {
+  currentMedications: MedicationItem[];
+  unverifiedMedications: MedicationItem[];
+}) {
+  const total = currentMedications.length + unverifiedMedications.length;
+  const bg = 'bg-green-500/10';
+  const border = 'border-green-500/20';
+
+  return (
+    <Card className="glass-card border border-white/10 overflow-hidden">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
+          <div className="p-1.5 rounded-lg bg-green-500/10">
+            <Pill className="h-4 w-4 text-green-400" />
+          </div>
+          Current Medications
+          <Badge className="ml-auto text-xs border bg-green-500/20 text-green-300 border-green-500/30">
+            {total}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {total === 0 ? (
+          <p className="text-xs text-white/40 italic">No medications documented</p>
+        ) : (
+          <div className="space-y-2">
+            {currentMedications.length > 0 && (
+              <>
+                {currentMedications.length > 0 && unverifiedMedications.length > 0 && (
+                  <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Verified</p>
+                )}
+                {currentMedications.map((med, i) => (
+                  <MedicationCard key={`v-${i}`} med={med} bg={bg} border={border} />
                 ))}
+              </>
+            )}
+            {unverifiedMedications.length > 0 && (
+              <>
+                {currentMedications.length > 0 && (
+                  <p className="text-xs text-white/40 uppercase tracking-wider mt-3 mb-1">Needs Review</p>
+                )}
+                {unverifiedMedications.map((med, i) => (
+                  <MedicationCard key={`u-${i}`} med={med} bg="bg-amber-500/5" border="border-amber-500/15" />
+                ))}
+              </>
+            )}
           </div>
         )}
       </CardContent>
@@ -197,13 +274,20 @@ const HealthMemoryPage = () => {
   const [data, setData] = useState<HealthMemoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildResult, setRebuildResult] = useState<{ recordsProcessed: number; skipped: number } | null>(null);
+
+  const getToken = useCallback(async () => {
+    let token = accessToken;
+    if (!token) token = await refreshAccessToken();
+    return token;
+  }, [accessToken, refreshAccessToken]);
 
   const fetchMemory = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let token = accessToken;
-      if (!token) token = await refreshAccessToken();
+      const token = await getToken();
       if (!token) { setError('Please log in to view your health memory.'); setLoading(false); return; }
 
       const res = await fetch('/api/memory', {
@@ -225,20 +309,43 @@ const HealthMemoryPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, refreshAccessToken]);
+  }, [getToken]);
 
-  useEffect(() => {
-    fetchMemory();
-  }, [fetchMemory]);
+  const handleRebuild = useCallback(async () => {
+    setRebuilding(true);
+    setRebuildResult(null);
+    try {
+      const token = await getToken();
+      if (!token) return;
 
-  useEffect(() => {
-    document.title = 'My Health Memory — MediNova';
-  }, []);
+      const res = await fetch('/api/memory/rebuild', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const result = await res.json() as { recordsProcessed: number; skipped: number };
+        setRebuildResult(result);
+        await fetchMemory();
+      }
+    } catch {
+    } finally {
+      setRebuilding(false);
+    }
+  }, [getToken, fetchMemory]);
+
+  useEffect(() => { fetchMemory(); }, [fetchMemory]);
+  useEffect(() => { document.title = 'My Health Memory — MediNova'; }, []);
+
+  const totalMedications = data
+    ? data.currentMedications.length + data.unverifiedMedications.length
+    : 0;
 
   const totalSignals = data
     ? data.allergies.length +
       data.chronicConditions.length +
-      data.currentMedications.length +
+      totalMedications +
       data.surgeries.length +
       data.medicationRestrictions.length +
       data.criticalEvents.length
@@ -262,19 +369,41 @@ const HealthMemoryPage = () => {
           transition={{ duration: 0.5 }}
           className="mb-10"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-medical/10 border border-medical/20">
-              <Brain className="h-6 w-6 text-medical" />
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-medical/10 border border-medical/20">
+                  <Brain className="h-6 w-6 text-medical" />
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold shimmer-text">
+                  My Health Memory
+                </h1>
+              </div>
+              <p className="text-white/60 max-w-2xl mt-2">
+                Your personal health memory is automatically built from every prescription and
+                medical record you upload. It tracks your allergies, conditions, medications,
+                and critical health events over time.
+              </p>
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold shimmer-text">
-              My Health Memory
-            </h1>
+            <div className="flex flex-col items-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRebuild}
+                disabled={rebuilding}
+                className="border-white/20 text-white/70 hover:text-white hover:border-white/40 bg-white/5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${rebuilding ? 'animate-spin' : ''}`} />
+                {rebuilding ? 'Rebuilding…' : 'Rebuild from Records'}
+              </Button>
+              {rebuildResult && (
+                <p className="text-xs text-white/40">
+                  Rebuilt from {rebuildResult.recordsProcessed} record(s)
+                  {rebuildResult.skipped > 0 && `, ${rebuildResult.skipped} skipped`}
+                </p>
+              )}
+            </div>
           </div>
-          <p className="text-white/60 max-w-2xl mt-2">
-            Your personal health memory is automatically built from every prescription and
-            medical record you upload. It tracks your allergies, conditions, medications,
-            and critical health events over time.
-          </p>
         </motion.div>
 
         {loading && (
@@ -307,7 +436,6 @@ const HealthMemoryPage = () => {
 
         {!loading && !error && data && (
           <>
-            {/* Stats bar */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -317,7 +445,7 @@ const HealthMemoryPage = () => {
               {[
                 { label: 'Records Processed', value: data.recordCount, icon: FileText, color: 'text-medical' },
                 { label: 'Health Signals', value: totalSignals, icon: Brain, color: 'text-blue-400' },
-                { label: 'Medications', value: data.currentMedications.length, icon: Pill, color: 'text-green-400' },
+                { label: 'Medications', value: totalMedications, icon: Pill, color: 'text-green-400' },
                 { label: 'Allergies', value: data.allergies.length, icon: AlertTriangle, color: 'text-red-400' },
               ].map(({ label, value, icon: Icon, color }) => (
                 <Card key={label} className="glass-card border border-white/10">
@@ -364,7 +492,6 @@ const HealthMemoryPage = () => {
               </motion.div>
             ) : (
               <div className="space-y-6">
-                {/* Condensed Profile */}
                 {data.condensedProfile && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -394,16 +521,18 @@ const HealthMemoryPage = () => {
                   </motion.div>
                 )}
 
-                {/* Memory sections grid */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                   className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 >
+                  <MedicationsCard
+                    currentMedications={data.currentMedications}
+                    unverifiedMedications={data.unverifiedMedications}
+                  />
                   {SECTION_CONFIG.map((section) => {
-                    const isMeds = section.key === 'currentMedications';
-                    const items = data[section.key] as (MemoryItem | MedicationItem)[];
+                    const items = data[section.key] as MemoryItem[];
                     return (
                       <SectionCard
                         key={section.key}
@@ -415,13 +544,11 @@ const HealthMemoryPage = () => {
                         badgeClass={section.badgeClass}
                         emptyText={section.emptyText}
                         items={items}
-                        isMedications={isMeds}
                       />
                     );
                   })}
                 </motion.div>
 
-                {/* Disclaimer */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -431,7 +558,8 @@ const HealthMemoryPage = () => {
                   <ShieldAlert className="h-4 w-4 text-yellow-400/70 shrink-0 mt-0.5" />
                   <p className="text-xs text-white/40">
                     This health memory is automatically extracted from uploaded documents using
-                    rule-based analysis. It is for personal reference only and does not constitute
+                    rule-based analysis. Unverified medications are flagged for review and may
+                    contain OCR errors. This is for personal reference only and does not constitute
                     medical advice. Always consult a qualified healthcare provider.
                   </p>
                 </motion.div>
