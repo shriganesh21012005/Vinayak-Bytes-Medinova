@@ -45,7 +45,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node scripts/dev-proxy.mjs"
+args = "pnpm --filter @workspace/health-chat-assistant run dev & node scripts/dev-proxy.mjs"
 waitForPort = 5000
 
 [agent]
@@ -59,10 +59,6 @@ timeoutMs = 20000
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
 
 [[ports]]
 localPort = 8081
