@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import NavigationHeader from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Phone, Clock, Heart, Droplet, Activity, AlertCircle, Info, Search } from 'lucide-react';
+import { MapPin, Phone, Clock, Heart, Droplet, Activity, AlertCircle, Info, Search, FolderOpen, Loader2 } from 'lucide-react';
 import MouseFollower from '@/components/MouseFollower';
+import RecordUploader from '@/components/RecordUploader';
+import RecordCard from '@/components/RecordCard';
+import { useAuth } from '@/contexts/AuthContext';
 
 const nearbyLabs = [
   {
@@ -86,13 +89,77 @@ const healthTips = {
   ]
 };
 
+interface HealthRecord {
+  _id: string;
+  originalFileName: string;
+  mimeType: string;
+  fileSize: number;
+  status: 'uploading' | 'processing' | 'completed' | 'failed' | 'blocked';
+  createdAt: string;
+  ocr?: {
+    engine: string;
+    confidence: number;
+    wordCount: number;
+    blocked: boolean;
+    blockReason?: string;
+  };
+  extraction?: {
+    source: string;
+    medicines: Array<{
+      name: string;
+      nameConfidence: 'high' | 'medium' | 'low' | 'unverified';
+      dosage?: string;
+      frequency?: string;
+      duration?: string;
+    }>;
+    warnings: string[];
+  };
+  memorySignals?: {
+    allergiesFound: string[];
+    conditionsFound: string[];
+    medicationsFound: string[];
+    criticalEventsFound: string[];
+  };
+}
+
 const PathoLab = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [userAddress, setUserAddress] = useState('123 Main St, Cityville, ST 12345');
+  const { isAuthenticated, accessToken, refreshAccessToken } = useAuth();
+  const [records, setRecords] = useState<HealthRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Patho Care - HealthCare";
   }, []);
+
+  const fetchRecords = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingRecords(true);
+    setRecordsError(null);
+    try {
+      let token = accessToken;
+      if (!token) token = await refreshAccessToken();
+      if (!token) { setRecordsError('Session expired. Please log in again.'); return; }
+
+      const res = await fetch('/api/records', {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to load records.');
+      const data = await res.json() as { records: HealthRecord[] };
+      setRecords(data.records);
+    } catch {
+      setRecordsError('Could not load records. Please try again.');
+    } finally {
+      setLoadingRecords(false);
+    }
+  }, [isAuthenticated, accessToken, refreshAccessToken]);
+
+  useEffect(() => {
+    fetchRecords();
+  }, [fetchRecords]);
 
   const filteredLabs = nearbyLabs.filter(lab =>
     lab.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -100,9 +167,14 @@ const PathoLab = () => {
     lab.services.some(service => service.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  function handleDelete(id: string) {
+    setRecords(prev => prev.filter(r => r._id !== id));
+  }
+
+  const token = accessToken ?? '';
+
   return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Static image background */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <img
           src="https://images.pexels.com/photos/9574518/pexels-photo-9574518.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
@@ -132,11 +204,13 @@ const PathoLab = () => {
         </motion.div>
 
         <Tabs defaultValue="labs" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8 glass-card p-1 rounded-xl">
+          <TabsList className="grid w-full max-w-lg mx-auto grid-cols-3 mb-8 glass-card p-1 rounded-xl">
             <TabsTrigger value="labs" className="data-[state=active]:bg-medical/20 dark:data-[state=active]:bg-medical/20 data-[state=active]:text-medical rounded-lg">Nearby Labs</TabsTrigger>
             <TabsTrigger value="tips" className="data-[state=active]:bg-medical/20 dark:data-[state=active]:bg-medical/20 data-[state=active]:text-medical rounded-lg">Health Tips</TabsTrigger>
+            <TabsTrigger value="records" className="data-[state=active]:bg-medical/20 dark:data-[state=active]:bg-medical/20 data-[state=active]:text-medical rounded-lg">My Records</TabsTrigger>
           </TabsList>
 
+          {/* ── Nearby Labs ── */}
           <TabsContent value="labs" className="space-y-8">
             <Card className="glass-card shadow-md">
               <CardHeader>
@@ -152,8 +226,8 @@ const PathoLab = () => {
                 <div className="flex items-center space-x-2">
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      value={userAddress} 
+                    <Input
+                      value={userAddress}
                       onChange={(e) => setUserAddress(e.target.value)}
                       className="pl-10 border-medical/20 dark:border-medical/20 focus-visible:ring-medical"
                       placeholder="Enter your full address"
@@ -221,8 +295,8 @@ const PathoLab = () => {
                           <p className="text-sm font-semibold mb-2">Available Services:</p>
                           <div className="flex flex-wrap gap-2">
                             {lab.services.map((service, idx) => (
-                              <span 
-                                key={idx} 
+                              <span
+                                key={idx}
                                 className="px-2 py-1 bg-medical/10 rounded-md text-xs text-medical border border-medical/20"
                               >
                                 {service}
@@ -254,8 +328,9 @@ const PathoLab = () => {
             )}
           </TabsContent>
 
+          {/* ── Health Tips ── */}
           <TabsContent value="tips" className="space-y-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
@@ -285,6 +360,107 @@ const PathoLab = () => {
                   </Card>
                 );
               })}
+            </motion.div>
+          </TabsContent>
+
+          {/* ── My Records ── */}
+          <TabsContent value="records" className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              {!isAuthenticated ? (
+                <Card className="glass-card text-center py-16">
+                  <CardContent>
+                    <FolderOpen className="h-12 w-12 text-medical/40 mx-auto mb-4" />
+                    <p className="text-white font-medium mb-1">Sign in to manage your records</p>
+                    <p className="text-white/50 text-sm mb-6">
+                      Upload prescriptions and medical reports to extract and store your medication data.
+                    </p>
+                    <Button
+                      className="bg-medical hover:bg-medical/80 text-white"
+                      onClick={() => window.location.href = '/login'}
+                    >
+                      Sign In
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {/* Upload section */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-medical text-lg">Upload Prescription or Report</CardTitle>
+                      <CardDescription className="text-white/50">
+                        PDF, JPEG, or PNG · Max 10 MB · OCR powered by Tesseract
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <RecordUploader
+                        accessToken={token}
+                        onUploaded={fetchRecords}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {/* Records list */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-white font-medium">
+                        Your Records{records.length > 0 && ` (${records.length})`}
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchRecords}
+                        disabled={loadingRecords}
+                        className="text-medical hover:text-medical/80 text-xs"
+                      >
+                        {loadingRecords ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                      </Button>
+                    </div>
+
+                    {loadingRecords && records.length === 0 && (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-6 w-6 text-medical animate-spin" />
+                      </div>
+                    )}
+
+                    {recordsError && (
+                      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                        {recordsError}
+                      </div>
+                    )}
+
+                    {!loadingRecords && !recordsError && records.length === 0 && (
+                      <Card className="glass-card text-center py-12">
+                        <CardContent>
+                          <FolderOpen className="h-10 w-10 text-medical/30 mx-auto mb-3" />
+                          <p className="text-white/50 text-sm">No records yet. Upload your first prescription above.</p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {records.map(record => (
+                        <motion.div
+                          key={record._id}
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <RecordCard
+                            record={record}
+                            accessToken={token}
+                            onDelete={handleDelete}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </TabsContent>
         </Tabs>

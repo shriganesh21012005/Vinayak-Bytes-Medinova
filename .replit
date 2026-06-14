@@ -30,3 +30,8 @@ externalPort = 8081
 [[ports]]
 localPort = 19579
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+ENABLE_OPENAI = "false"
