@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, X, Send, ChevronUp, Sparkles } from 'lucide-react';
+import { Bot, X, Send, ChevronUp, Sparkles, Trash2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { healthKnowledgeBase } from '@/lib/healthKnowledgeBase';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Message {
@@ -13,276 +13,238 @@ interface Message {
   content: string;
 }
 
+const WELCOME_MESSAGE: Message = {
+  role: 'assistant',
+  content: "Hi! I'm your MediNova AI health assistant. I can answer general health questions and, if you've uploaded medical records, I'll factor your personal health profile into my responses.\n\nHow can I help you today?",
+};
+
+const API_BASE = '/api';
+
 const ChatAssistant = () => {
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hi! I'm your Medi Nova AI assistant powered by OpenAI. How can I help you with your health concerns today?" }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingText, setTypingText] = useState("");
-  const [fullResponse, setFullResponse] = useState("");
-  const [typingSpeed, setTypingSpeed] = useState(20); // slightly faster typing
-  const chatRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { isAuthenticated, accessToken, refreshAccessToken } = useAuth();
   const { toast } = useToast();
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, typingText]);
+  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (chatRef.current && !chatRef.current.contains(event.target as Node)) {
-        // Don't close, just minimize
         if (isChatOpen && !isMinimized) {
           setIsMinimized(true);
         }
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isChatOpen, isMinimized]);
 
-  // Typing effect simulation
-  useEffect(() => {
-    if (!isTyping || !fullResponse) return;
-    
-    let i = 0;
-    const typingInterval = setInterval(() => {
-      if (i < fullResponse.length) {
-        setTypingText(fullResponse.substring(0, i + 1));
-        i++;
-      } else {
-        clearInterval(typingInterval);
-        setIsTyping(false);
-        // Add the full message to the chat history
-        setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: fullResponse }]);
-        setFullResponse("");
-        setTypingText("");
+  const loadHistory = useCallback(async (token: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/chat/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { messages: Array<{ role: 'user' | 'assistant'; content: string }> };
+      if (data.messages.length > 0) {
+        setMessages(data.messages);
       }
-    }, typingSpeed);
-    
-    return () => clearInterval(typingInterval);
-  }, [isTyping, fullResponse, typingSpeed]);
-
-  // Enhanced AI response generation with more OpenAI-like responses
-  const generateResponse = (userQuery: string) => {
-    // Check for health-related keywords
-    const query = userQuery.toLowerCase();
-    
-    // Start with a greeting and acknowledgment
-    let responseStart = "I understand you're asking about ";
-    
-    // Analysis based on categories (OpenAI-style approach)
-    if (query.includes("symptom") || query.includes("feel") || query.includes("pain") || query.includes("hurt")) {
-      // Symptom checker response style
-      return `${responseStart}symptoms you're experiencing. While I can provide general information, it's important to consult with a healthcare professional for proper diagnosis. 
-
-Based on current medical knowledge, various symptoms can indicate different conditions. Could you tell me more about what you're experiencing, including when it started and any other symptoms you may have?`;
-    } 
-    else if (query.includes("appointment") || query.includes("schedule") || query.includes("book")) {
-      return `${responseStart}booking an appointment at Medi Nova. 
-
-You have several options:
-1. Use our online booking system through the Medi Nova app
-2. Call our appointment line at (555) 123-4567
-3. Visit the reception desk in person
-
-What type of appointment are you looking to schedule? We have general practitioners as well as specialists in various fields.`;
-    } 
-    else if (query.includes("doctor") || query.includes("specialist") || query.includes("physician")) {
-      return `${responseStart}finding the right medical professional for your needs.
-
-Medi Nova has an extensive team of healthcare providers across various specialties:
-• General practitioners for routine care
-• Cardiologists for heart-related concerns
-• Neurologists for brain and nervous system issues
-• Orthopedists for bone and joint problems
-• Pediatricians for children's healthcare
-• And many more specialists
-
-What specific medical concern are you seeking help with? This will help me recommend the most appropriate specialist.`;
-    } 
-    else if (query.includes("emergency") || query.includes("urgent")) {
-      return `It seems you're inquiring about emergency services. If you're experiencing a life-threatening emergency, please call 911 immediately.
-
-For urgent but non-life-threatening conditions, Medi Nova offers:
-• 24/7 urgent care at our main facility (123 Main Street)
-• Virtual urgent care consultations through our app
-• Current emergency department wait time: approximately 15 minutes
-
-Can I provide more specific information about our emergency services?`;
+    } catch {
+      // silently ignore — welcome message stays
     }
-    else if (query.includes("medication") || query.includes("prescription") || query.includes("drug") || query.includes("medicine")) {
-      return `${responseStart}medications and prescriptions.
+  }, []);
 
-Important information regarding medications at Medi Nova:
-• For prescription refills, please contact our pharmacy at (555) 987-6543
-• Our pharmacy is open 7am-10pm daily
-• We offer medication delivery for seniors and those with mobility challenges
-• Our pharmacists are available for medication consultations
+  const openChat = useCallback(async () => {
+    setIsChatOpen(true);
+    setIsMinimized(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
 
-Would you like information about a specific medication or our prescription services?`;
+    if (isAuthenticated && accessToken && !historyLoaded) {
+      setHistoryLoaded(true);
+      await loadHistory(accessToken);
     }
-    else if (query.includes("insurance") || query.includes("cover") || query.includes("payment") || query.includes("cost")) {
-      return `${responseStart}insurance coverage and payment options.
+  }, [isAuthenticated, accessToken, historyLoaded, loadHistory]);
 
-Medi Nova accepts most major insurance plans including:
-• BlueCross BlueShield
-• Aetna
-• Cigna
-• Medicare and Medicaid
-• United Healthcare
+  // Reset history-loaded flag when auth state changes
+  useEffect(() => {
+    setHistoryLoaded(false);
+    setMessages([WELCOME_MESSAGE]);
+  }, [isAuthenticated]);
 
-We also offer flexible payment plans and financial assistance programs for qualifying patients. Would you like to speak with one of our financial counselors for more detailed information about your specific coverage?`;
+  const getToken = useCallback(async (): Promise<string | null> => {
+    if (accessToken) return accessToken;
+    return refreshAccessToken();
+  }, [accessToken, refreshAccessToken]);
+
+  const handleSendMessage = useCallback(async () => {
+    const text = inputMessage.trim();
+    if (!text || isLoading || isStreaming) return;
+
+    if (!isAuthenticated) {
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: text },
+        {
+          role: 'assistant',
+          content: "To use the AI Health Assistant, please sign in or create a free account. Your responses will then be personalised based on your uploaded health records.",
+        },
+      ]);
+      setInputMessage('');
+      return;
     }
-    else if (query.includes("test") || query.includes("lab") || query.includes("result") || query.includes("scan")) {
-      return `${responseStart}medical tests or lab results.
 
-At Medi Nova, we offer comprehensive diagnostic services:
-• Most lab results are available within 24-48 hours
-• Test results can be accessed through your secure patient portal
-• Our lab is open Monday-Friday 7am-7pm and Saturday 8am-2pm
-• For urgent results, please contact your provider directly
-
-If you've recently had testing done, I can guide you on how to access your results or connect you with our lab department.`;
-    }
-    else if (query.includes("diet") || query.includes("nutrition") || query.includes("eat") || query.includes("food")) {
-      return `${responseStart}nutrition and dietary recommendations.
-
-Proper nutrition is a cornerstone of good health. Based on current medical consensus:
-• A balanced diet typically includes fruits, vegetables, whole grains, lean proteins, and healthy fats
-• Nutritional needs vary based on age, sex, activity level, and medical conditions
-• Medi Nova offers personalized nutrition consultations with registered dietitians
-
-Would you like general dietary guidelines or information about scheduling a consultation with one of our nutrition specialists?`;
-    }
-    else if (query.includes("exercise") || query.includes("workout") || query.includes("fitness") || query.includes("active")) {
-      return `${responseStart}physical activity and exercise recommendations.
-
-Current health guidelines suggest:
-• Adults should aim for at least 150 minutes of moderate-intensity aerobic activity weekly
-• Strength training activities should be included at least twice per week
-• Even small amounts of physical activity provide health benefits
-• Exercise programs should be tailored to individual health conditions and fitness levels
-
-Medi Nova offers physical therapy and exercise physiology services to help design safe, effective exercise programs. What are your specific fitness goals?`;
-    }
-    else if (query.includes("stress") || query.includes("anxiety") || query.includes("depress") || query.includes("mental")) {
-      return `${responseStart}mental health concerns, which are just as important as physical health.
-
-Medi Nova provides comprehensive mental health services:
-• Individual therapy with licensed psychologists and counselors
-• Psychiatric care and medication management
-• Group therapy and support groups
-• Crisis intervention services
-
-Everyone experiences mental health challenges differently. Would you like information about specific mental health resources or services?`;
-    }
-    else if (query.includes("covid") || query.includes("vaccine") || query.includes("vaccination") || query.includes("shot")) {
-      return `${responseStart}COVID-19 information or vaccinations.
-
-Current COVID-19 information at Medi Nova:
-• We offer testing (PCR and rapid) at all locations
-• Vaccinations are available without appointment
-• Boosters are recommended according to CDC guidelines
-• Virtual consultations are available for COVID-related concerns
-
-Our COVID protocols are regularly updated based on the latest scientific evidence and public health guidelines. How can I help you specifically with COVID-related services?`;
-    }
-    else if (query.includes("prevention") || query.includes("wellness") || query.includes("checkup") || query.includes("screening")) {
-      return `${responseStart}preventive care and wellness.
-
-Preventive healthcare at Medi Nova focuses on:
-• Regular health screenings based on age, sex, and risk factors
-• Immunizations following recommended schedules
-• Lifestyle counseling for nutrition, exercise, and stress management
-• Early detection through appropriate diagnostic testing
-
-Preventive care is often covered by insurance with little or no out-of-pocket cost. Would you like information about specific screening recommendations based on your demographic profile?`;
-    }
-    else if (query.includes("hello") || query.includes("hi") || query.includes("hey")) {
-      return `Hello! I'm your Medi Nova AI health assistant, powered by advanced technology similar to ChatGPT. I'm here to provide information and assistance with your health-related questions.
-
-I can help with:
-• Understanding medical conditions and symptoms
-• Navigating Medi Nova services
-• Finding the right healthcare provider
-• Preventive health recommendations
-• And much more
-
-How can I assist you with your healthcare needs today?`;
-    }
-    else if (query.includes("thank") || query.includes("thanks")) {
-      return `You're welcome! I'm happy to help with your healthcare questions and needs. If you have any other questions about Medi Nova services or health information, please don't hesitate to ask.
-
-Your health and wellbeing are our top priorities. Is there anything else I can assist you with today?`;
-    }
-    else if (query.includes("bye") || query.includes("goodbye")) {
-      return `Thank you for chatting with me today. If you need any further assistance with your healthcare needs, I'll be here 24/7.
-
-Take care and stay healthy! Remember that Medi Nova is always available for your healthcare needs.`;
-    }
-    else {
-      // General health inquiry with OpenAI-style comprehensive response
-      return `Thank you for your question. 
-
-While I don't have specific information about "${userQuery}", I'd be happy to provide general guidance based on medical knowledge.
-
-Medi Nova offers comprehensive healthcare services including preventive care, specialized treatments, diagnostic testing, and emergency services. Our team of medical professionals is committed to providing personalized care tailored to your needs.
-
-Could you provide more specific details about your question so I can better assist you? I'm here to help with any health-related concerns you might have.`;
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
-
-    const userMessage = inputMessage.trim();
     setInputMessage('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
     setIsLoading(true);
 
-    // Focus back on input after sending
-    inputRef.current?.focus();
-
-    // Simulate processing time for more natural interaction
-    setTimeout(() => {
-      const response = generateResponse(userMessage);
+    const token = await getToken();
+    if (!token) {
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: "Your session has expired. Please sign in again to continue." },
+      ]);
       setIsLoading(false);
-      
-      // Add a temporary message that will be replaced by the typing animation
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-      setFullResponse(response);
-      setIsTyping(true);
-    }, 1000);
-  };
+      return;
+    }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    try {
+      const res = await fetch(`${API_BASE}/chat/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ message: text }),
+        signal: abort.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({ error: 'Request failed' })) as { error: string };
+        throw new Error(errData.error ?? 'Request failed');
+      }
+
+      setIsLoading(false);
+      setIsStreaming(true);
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          const jsonStr = part.slice(6).trim();
+          if (!jsonStr) continue;
+
+          let event: { type: string; content?: string; message?: string };
+          try {
+            event = JSON.parse(jsonStr) as typeof event;
+          } catch {
+            continue;
+          }
+
+          if (event.type === 'chunk' && event.content) {
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === 'assistant') {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: last.content + event.content,
+                };
+              }
+              return updated;
+            });
+          } else if (event.type === 'done') {
+            break;
+          } else if (event.type === 'error') {
+            throw new Error(event.message ?? 'Stream error');
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return;
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'assistant' && last.content === '') {
+          updated[updated.length - 1] = { role: 'assistant', content: msg };
+        } else {
+          updated.push({ role: 'assistant', content: msg });
+        }
+        return updated;
+      });
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+      setIsStreaming(false);
+      abortRef.current = null;
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [inputMessage, isLoading, isStreaming, isAuthenticated, getToken, toast]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const openChat = () => {
-    setIsChatOpen(true);
-    setIsMinimized(false);
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-  };
+  const handleClearChat = useCallback(async () => {
+    if (!isAuthenticated || !accessToken) {
+      setMessages([WELCOME_MESSAGE]);
+      return;
+    }
+
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+
+    try {
+      await fetch(`${API_BASE}/chat`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        credentials: 'include',
+      });
+    } catch {
+      // best-effort
+    }
+    setMessages([WELCOME_MESSAGE]);
+    setIsLoading(false);
+    setIsStreaming(false);
+  }, [isAuthenticated, accessToken]);
 
   return (
     <div className="fixed bottom-5 right-5 z-50" ref={chatRef}>
@@ -290,122 +252,147 @@ Could you provide more specific details about your question so I can better assi
         {isChatOpen && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ 
-              opacity: 1, 
-              y: 0, 
+            animate={{
+              opacity: 1,
+              y: 0,
               scale: 1,
               height: isMinimized ? 'auto' : 480,
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             className={cn(
-              "bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden flex flex-col",
-              isMinimized ? "h-auto" : "h-[480px]"
+              'bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden flex flex-col',
+              isMinimized ? 'h-auto' : 'h-[480px]'
             )}
           >
-            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8 border-2 border-white/20">
                   <AvatarImage src="/mediNova-logo.png" alt="Bot" />
-                  <AvatarFallback className="bg-blue-800 text-white">MN</AvatarFallback>
+                  <AvatarFallback className="bg-blue-800 text-white text-xs">MN</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-medium">Medi Nova AI</span>
-                  <span className="text-xs text-white/70 flex items-center">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Powered by OpenAI
+                  <span className="font-medium text-sm">MediNova AI</span>
+                  <span className="text-xs text-white/70 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    {isAuthenticated ? 'Health-aware assistant' : 'AI Health Assistant'}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button 
+                {isAuthenticated && !isMinimized && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleClearChat}
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-white hover:bg-white/10"
+                        disabled={isStreaming}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Clear conversation</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <Button
                   onClick={() => setIsMinimized(!isMinimized)}
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/10"
+                  className="h-7 w-7 text-white hover:bg-white/10"
                 >
                   <ChevronUp className={`h-5 w-5 transition-transform ${isMinimized ? 'rotate-180' : ''}`} />
                 </Button>
-                <Button 
-                  onClick={() => setIsChatOpen(false)}
+                <Button
+                  onClick={() => {
+                    if (abortRef.current) abortRef.current.abort();
+                    setIsChatOpen(false);
+                  }}
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-white hover:bg-white/10"
+                  className="h-7 w-7 text-white hover:bg-white/10"
                 >
                   <X className="h-5 w-5" />
                 </Button>
               </div>
             </div>
-            
+
             {!isMinimized && (
               <>
-                <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+                {/* Messages */}
+                <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
                   <AnimatePresence initial={false}>
                     {messages.map((message, index) => (
                       <motion.div
                         key={index}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className={`flex items-start gap-2 mb-4 ${
-                          message.role === 'user' ? 'flex-row-reverse' : ''
-                        }`}
+                        transition={{ duration: 0.25 }}
+                        className={`flex items-start gap-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
                       >
                         {message.role === 'assistant' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarImage src="/mediNova-logo.png" alt="Bot" />
-                            <AvatarFallback className="bg-blue-600 text-white">MN</AvatarFallback>
+                          <Avatar className="h-7 w-7 mt-0.5 flex-shrink-0">
+                            <AvatarImage src="/mediNova-logo.png" alt="AI" />
+                            <AvatarFallback className="bg-blue-600 text-white text-xs">MN</AvatarFallback>
                           </Avatar>
                         )}
                         {message.role === 'user' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarImage src="/placeholder.svg" alt="You" />
-                            <AvatarFallback className="bg-gray-200 text-gray-700">You</AvatarFallback>
+                          <Avatar className="h-7 w-7 mt-0.5 flex-shrink-0">
+                            <AvatarFallback className="bg-gray-300 text-gray-700 text-xs">You</AvatarFallback>
                           </Avatar>
                         )}
-                        <motion.div
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                          className={`rounded-lg p-3 text-sm max-w-[230px] ${
+                        <div
+                          className={cn(
+                            'rounded-2xl px-3 py-2 text-sm max-w-[230px] leading-relaxed',
                             message.role === 'user'
-                              ? 'bg-blue-600 text-white font-medium'
-                              : 'bg-white text-gray-900 border border-gray-200 shadow-sm font-medium'
-                          }`}
+                              ? 'bg-blue-600 text-white rounded-tr-sm'
+                              : 'bg-white text-gray-900 border border-gray-200 shadow-sm rounded-tl-sm',
+                            isStreaming && index === messages.length - 1 && message.role === 'assistant' && message.content === ''
+                              ? 'min-w-[48px] min-h-[32px]'
+                              : ''
+                          )}
                         >
-                          <p className="whitespace-pre-line">{
-                            // If this is the last message and we're typing, show the typing text
-                            isTyping && index === messages.length - 1 ? typingText : message.content
-                          }</p>
-                        </motion.div>
+                          {isStreaming && index === messages.length - 1 && message.role === 'assistant' && message.content === '' ? (
+                            <div className="flex space-x-1 items-center h-4">
+                              {[0, 0.2, 0.4].map((delay) => (
+                                <motion.div
+                                  key={delay}
+                                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                                  transition={{ repeat: Infinity, duration: 0.9, delay }}
+                                  className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="whitespace-pre-line">{message.content}</p>
+                          )}
+                        </div>
                       </motion.div>
                     ))}
+
                     {isLoading && (
                       <motion.div
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-start gap-2 mb-4"
+                        className="flex items-start gap-2"
                       >
-                        <Avatar className="h-8 w-8 mt-1">
-                          <AvatarImage src="/mediNova-logo.png" alt="Bot" />
-                          <AvatarFallback className="bg-blue-600 text-white">MN</AvatarFallback>
+                        <Avatar className="h-7 w-7 mt-0.5 flex-shrink-0">
+                          <AvatarFallback className="bg-blue-600 text-white text-xs">MN</AvatarFallback>
                         </Avatar>
-                        <div className="bg-white rounded-lg p-3 text-gray-900 border border-gray-200 shadow-sm">
-                          <div className="flex space-x-1">
-                            <motion.div
-                              animate={{ scale: [0.8, 1, 0.8] }}
-                              transition={{ repeat: Infinity, duration: 1 }}
-                              className="h-2 w-2 rounded-full bg-blue-400"
-                            />
-                            <motion.div
-                              animate={{ scale: [0.8, 1, 0.8] }}
-                              transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
-                              className="h-2 w-2 rounded-full bg-blue-400"
-                            />
-                            <motion.div
-                              animate={{ scale: [0.8, 1, 0.8] }}
-                              transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
-                              className="h-2 w-2 rounded-full bg-blue-400"
-                            />
+                        <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2 border border-gray-200 shadow-sm">
+                          <div className="flex space-x-1 items-center h-4">
+                            {[0, 0.2, 0.4].map((delay) => (
+                              <motion.div
+                                key={delay}
+                                animate={{ scale: [0.8, 1.2, 0.8] }}
+                                transition={{ repeat: Infinity, duration: 0.9, delay }}
+                                className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                              />
+                            ))}
                           </div>
                         </div>
                       </motion.div>
@@ -414,29 +401,40 @@ Could you provide more specific details about your question so I can better assi
                   </AnimatePresence>
                 </div>
 
-                <div className="p-3 border-t bg-white">
-                  <div className="relative rounded-full overflow-hidden border border-gray-300 focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400">
+                {/* Input */}
+                <div className="p-3 border-t bg-white flex-shrink-0">
+                  {!isAuthenticated && (
+                    <div className="mb-2 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <LogIn className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>Sign in for personalised health responses</span>
+                    </div>
+                  )}
+                  <div className="relative rounded-xl overflow-hidden border border-gray-300 focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-blue-400 bg-white">
                     <textarea
                       ref={inputRef}
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      placeholder="Ask any health question..."
-                      className="w-full px-4 py-2 pr-12 text-sm max-h-20 resize-none focus:outline-none text-gray-900 font-medium"
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask a health question…"
+                      className="w-full px-3 py-2 pr-10 text-sm max-h-24 resize-none focus:outline-none text-gray-900 bg-transparent"
                       rows={1}
                     />
                     <button
                       onClick={handleSendMessage}
-                      disabled={!inputMessage.trim() || isLoading || isTyping}
-                      className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full transition-colors ${
-                        inputMessage.trim() && !isLoading && !isTyping
+                      disabled={!inputMessage.trim() || isLoading || isStreaming}
+                      className={cn(
+                        'absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors',
+                        inputMessage.trim() && !isLoading && !isStreaming
                           ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-200 text-gray-500'
-                      }`}
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      )}
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <p className="mt-1.5 text-center text-[10px] text-gray-400">
+                    General health information only · Not medical advice
+                  </p>
                 </div>
               </>
             )}
@@ -451,13 +449,13 @@ Could you provide more specific details about your question so I can better assi
               <motion.button
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={openChat}
-                className="bg-primary text-primary-foreground p-4 rounded-full shadow-lg flex items-center gap-2"
+                className="bg-primary text-primary-foreground px-4 py-3 rounded-full shadow-lg flex items-center gap-2"
               >
-                <Bot className="w-6 h-6" />
-                <span className="hidden md:inline font-medium">AI Health Assistant</span>
+                <Bot className="w-5 h-5" />
+                <span className="hidden md:inline text-sm font-medium">AI Health Assistant</span>
               </motion.button>
             </TooltipTrigger>
             <TooltipContent side="left">
