@@ -172,11 +172,11 @@ function splitMedicines(medicines: IMedicine[]): {
   unverified: Array<{ name: string; dosage?: string; frequency?: string; confidence: "unverified" }>;
 } {
   const verified = medicines
-    .filter(m => m.name && m.nameConfidence === "verified")
+    .filter(m => m.name && (m.nameConfidence === "high" || m.nameConfidence === "medium"))
     .map(m => ({ name: m.name, dosage: m.dosage, frequency: m.frequency, confidence: "verified" as const }));
 
   const unverified = medicines
-    .filter(m => m.name && m.nameConfidence !== "verified")
+    .filter(m => m.name && (m.nameConfidence === "low" || m.nameConfidence === "unverified"))
     .map(m => ({ name: m.name, dosage: m.dosage, frequency: m.frequency, confidence: "unverified" as const }));
 
   return { verified, unverified };
