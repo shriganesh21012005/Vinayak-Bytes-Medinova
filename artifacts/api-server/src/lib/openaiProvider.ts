@@ -52,7 +52,8 @@ export async function* generateOpenAIStream(
   userMessage: string,
   memory: IHealthMemory | null,
   history: ChatHistoryMessage[],
-  apiKey: string
+  apiKey: string,
+  clinicalSummaryBlock?: string
 ): AsyncGenerator<StreamChunk> {
   // Safety layer — always enforced regardless of AI provider
   const safety = analyzeSafety(userMessage);
@@ -74,7 +75,7 @@ export async function* generateOpenAIStream(
 
   const client = new OpenAI({ apiKey, timeout: 30_000 });
 
-  const systemPrompt = buildSystemPrompt(memory);
+  const systemPrompt = buildSystemPrompt(memory, clinicalSummaryBlock);
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },

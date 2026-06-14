@@ -1,0 +1,162 @@
+Implement Phase 5: Clinical Summary Engine in the MediNova backend.
+
+==================================================
+FEATURE NAME: CLINICAL SUMMARY ENGINE
+==================================================
+
+Goal:
+Before a consultation/chat session, generate a doctor-facing structured patient summary from the user's HealthMemory.
+
+This summary will NOT be conversational. It is a structured medical snapshot used for doctors.
+
+==================================================
+WHERE TO IMPLEMENT
+==================================================
+
+1. Create new file:
+   /lib/clinicalSummaryEngine.ts
+
+2. Integrate into:
+   /routes/chat.ts
+   OR
+   /routes/clinicalSummary.ts (create new route if needed)
+
+3. Use existing:
+   - HealthMemory model (MongoDB)
+   - healthMemoryEngine.ts (for data source)
+
+==================================================
+CORE FUNCTION
+==================================================
+
+Create a function:
+
+generateClinicalSummary(userId: string)
+
+This function must:
+
+1. Fetch user's HealthMemory from MongoDB
+2. Extract and normalize:
+
+   - Allergies
+   - Chronic Conditions
+   - Medications (name, dose, frequency)
+   - Medical Events (heart attack, stroke, surgeries, etc.)
+   - Risks (derived from conditions + meds)
+   - Restrictions (e.g. drug allergies, contraindicated drugs if available)
+
+3. Return a STRICT structured JSON object:
+
+{
+  "majorAllergies": [],
+  "chronicConditions": [],
+  "medicalEvents": [],
+  "medications": [],
+  "criticalHealthRisks": [],
+  "importantRestrictions": [],
+  "generatedAt": ""
+}
+
+==================================================
+OPTIONAL AI ENHANCEMENT (IMPORTANT)
+==================================================
+
+After structuring raw data, optionally call OpenAI GPT-4o-mini to refine summary:
+
+Use system prompt:
+
+"""
+You are a clinical summarization engine.
+
+Convert raw patient health data into a concise, doctor-facing clinical summary.
+
+Rules:
+- Do NOT diagnose
+- Do NOT prescribe
+- Do NOT add new medical facts
+- Only reorganize and summarize given data
+- Output must be structured JSON only
+"""
+
+Input: structured HealthMemory data
+
+Output: cleaned JSON summary
+
+==================================================
+NEW API ENDPOINT
+==================================================
+
+Create endpoint:
+
+GET /api/clinical-summary
+
+Requirements:
+- Must require authentication (JWT protected)
+- Fetch userId from request
+- Call generateClinicalSummary(userId)
+- Return JSON response
+
+==================================================
+INTEGRATION WITH CHAT (IMPORTANT)
+==================================================
+
+Modify /routes/chat.ts:
+
+Before starting chat completion:
+- Fetch clinical summary
+- Attach it to system prompt as:
+
+"CLINICAL SUMMARY (DOCTOR VIEW ONLY):
+{json summary}
+
+Use this ONLY for contextual understanding.
+Do NOT expose full structured JSON to user unless asked."
+
+==================================================
+SAFETY RULES
+==================================================
+
+- NEVER expose raw medical reasoning
+- NEVER diagnose or prescribe
+- NEVER change clinical data
+- This is READ-ONLY summarization layer
+
+==================================================
+OUTPUT FORMAT (VERY IMPORTANT)
+==================================================
+
+Always return clean JSON only for the summary engine.
+
+No markdown.
+No explanations.
+No text outside JSON.
+
+==================================================
+EXTRA (OPTIONAL BUT RECOMMENDED)
+==================================================
+
+Add caching:
+- Store generated summary in MongoDB for 24 hours
+- Avoid regenerating on every request
+
+Collection:
+ClinicalSummaryCache
+
+Fields:
+- userId
+- summary
+- createdAt
+- expiresAt
+
+==================================================
+END GOAL
+==================================================
+
+Doctor can open a patient profile and instantly see:
+- allergies
+- conditions
+- meds
+- risks
+- key history
+
+This should reduce consultation time and improve medical clarity.

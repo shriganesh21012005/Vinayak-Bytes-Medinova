@@ -5,6 +5,7 @@ import { ChatConversation } from "../models/ChatConversation";
 import { ChatMessage } from "../models/ChatMessage";
 import { HealthMemory } from "../models/HealthMemory";
 import { generateStream, type ChatHistoryMessage } from "../lib/aiProvider";
+import { generateClinicalSummary, formatClinicalSummaryForPrompt } from "../lib/clinicalSummaryEngine";
 
 const router = Router();
 
@@ -69,11 +70,18 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       .slice(0, -1)
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    const memory = await HealthMemory.findOne({ userId: userOid });
+    const [memory, clinicalSummary] = await Promise.all([
+      HealthMemory.findOne({ userId: userOid }),
+      generateClinicalSummary(userId).catch(() => null),
+    ]);
+
+    const clinicalSummaryBlock = clinicalSummary
+      ? formatClinicalSummaryForPrompt(clinicalSummary)
+      : undefined;
 
     let fullContent = "";
 
-    for await (const chunk of generateStream(trimmed, memory, history)) {
+    for await (const chunk of generateStream(trimmed, memory, history, clinicalSummaryBlock)) {
       if (chunk.type === "chunk" && chunk.content) {
         fullContent += chunk.content;
         send(chunk);
