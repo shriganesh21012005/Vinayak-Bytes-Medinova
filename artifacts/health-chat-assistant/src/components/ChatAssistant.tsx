@@ -154,9 +154,9 @@ const ChatAssistant = () => {
       const decoder = new TextDecoder();
       let buffer = '';
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) break outer;
 
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split('\n\n');
@@ -187,7 +187,8 @@ const ChatAssistant = () => {
               return updated;
             });
           } else if (event.type === 'done') {
-            break;
+            void reader.cancel();
+            break outer;
           } else if (event.type === 'error') {
             throw new Error(event.message ?? 'Stream error');
           }

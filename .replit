@@ -76,6 +76,10 @@ timeoutMs = 20000
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 19579
+externalPort = 80
+
 [userenv]
 
 [userenv.shared]
