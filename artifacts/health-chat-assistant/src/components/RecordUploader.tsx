@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Image, X, Loader2, Shield, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Image, X, Loader2, Shield, CheckCircle, Brain } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
@@ -215,19 +216,34 @@ export default function RecordUploader({ accessToken, onUploaded }: RecordUpload
                 </div>
               </div>
             ) : (
-              <div className="flex gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                <CheckCircle className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-green-300">Scan Complete</p>
-                  {state.result.ocr && (
-                    <p className="text-xs text-white/50">
-                      Confidence: {Math.round(state.result.ocr.confidence * 100)}% ·{' '}
-                      {state.result.extraction?.medicines.length ?? 0} medicine(s) found ·{' '}
-                      Engine: {state.result.ocr.engine}
+              <>
+                <div className="flex gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <CheckCircle className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-green-300">Scan Complete</p>
+                    {state.result.ocr && (
+                      <p className="text-xs text-white/50">
+                        Confidence: {Math.round(state.result.ocr.confidence * 100)}% ·{' '}
+                        {state.result.extraction?.medicines.length ?? 0} medicine(s) found ·{' '}
+                        Engine: {state.result.ocr.engine}
+                      </p>
+                    )}
+                    <p className="text-xs text-white/40 pt-0.5">
+                      Your health memory has been updated automatically.
                     </p>
-                  )}
+                  </div>
                 </div>
-              </div>
+
+                <Link to="/health-memory" className="block">
+                  <Button
+                    size="sm"
+                    className="w-full bg-medical hover:bg-medical/80 text-white text-xs"
+                  >
+                    <Brain className="h-3.5 w-3.5 mr-1.5" />
+                    View Health Memory
+                  </Button>
+                </Link>
+              </>
             )}
 
             <Button

@@ -293,9 +293,8 @@ const HealthMemoryPage = () => {
   const { accessToken, refreshAccessToken } = useAuth();
   const [data, setData] = useState<HealthMemoryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rebuilding, setRebuilding] = useState(false);
-  const [rebuildResult, setRebuildResult] = useState<{ recordsProcessed: number; skipped: number } | null>(null);
 
   const getToken = useCallback(async () => {
     let token = accessToken;
@@ -303,12 +302,13 @@ const HealthMemoryPage = () => {
     return token;
   }, [accessToken, refreshAccessToken]);
 
-  const fetchMemory = useCallback(async () => {
-    setLoading(true);
+  const fetchMemory = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     setError(null);
     try {
       const token = await getToken();
-      if (!token) { setError('Please log in to view your health memory.'); setLoading(false); return; }
+      if (!token) { setError('Please log in to view your health memory.'); return; }
 
       const res = await fetch('/api/memory', {
         headers: { Authorization: `Bearer ${token}` },
@@ -318,7 +318,6 @@ const HealthMemoryPage = () => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
         setError(err.error ?? 'Failed to load health memory.');
-        setLoading(false);
         return;
       }
 
@@ -328,34 +327,23 @@ const HealthMemoryPage = () => {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [getToken]);
 
-  const handleRebuild = useCallback(async () => {
-    setRebuilding(true);
-    setRebuildResult(null);
-    try {
-      const token = await getToken();
-      if (!token) return;
-
-      const res = await fetch('/api/memory/rebuild', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-      });
-
-      if (res.ok) {
-        const result = await res.json() as { recordsProcessed: number; skipped: number };
-        setRebuildResult(result);
-        await fetchMemory();
-      }
-    } catch {
-    } finally {
-      setRebuilding(false);
-    }
-  }, [getToken, fetchMemory]);
-
   useEffect(() => { fetchMemory(); }, [fetchMemory]);
+
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') fetchMemory(true);
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', () => fetchMemory(true));
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [fetchMemory]);
+
   useEffect(() => { document.title = 'My Health Memory — MediNova'; }, []);
 
   const totalMedications = data
@@ -398,30 +386,15 @@ const HealthMemoryPage = () => {
                 <h1 className="text-3xl md:text-4xl font-bold shimmer-text">
                   My Health Memory
                 </h1>
+                {refreshing && (
+                  <RefreshCw className="h-4 w-4 text-white/30 animate-spin" />
+                )}
               </div>
               <p className="text-white/60 max-w-2xl mt-2">
                 Your personal health memory is automatically built from every prescription and
                 medical record you upload. It tracks your allergies, conditions, medications,
                 and critical health events over time.
               </p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRebuild}
-                disabled={rebuilding}
-                className="border-white/20 text-white/70 hover:text-white hover:border-white/40 bg-white/5"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${rebuilding ? 'animate-spin' : ''}`} />
-                {rebuilding ? 'Rebuilding…' : 'Rebuild from Records'}
-              </Button>
-              {rebuildResult && (
-                <p className="text-xs text-white/40">
-                  Rebuilt from {rebuildResult.recordsProcessed} record(s)
-                  {rebuildResult.skipped > 0 && `, ${rebuildResult.skipped} skipped`}
-                </p>
-              )}
             </div>
           </div>
         </motion.div>
@@ -444,7 +417,7 @@ const HealthMemoryPage = () => {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={fetchMemory}
+                onClick={() => fetchMemory()}
                 className="mt-2 text-red-400 hover:text-red-300 px-0 h-auto"
               >
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
