@@ -15,6 +15,8 @@ import Doctors from "./pages/Doctors";
 import Hospital from "./pages/Hospital";
 import Ambulance from "./pages/Ambulance";
 import Support from "./pages/Support";
+import HealthMemoryPage from "./pages/HealthMemory";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,14 @@ const App = () => (
             <Route path="/hospital" element={<Hospital />} />
             <Route path="/ambulance" element={<Ambulance />} />
             <Route path="/support" element={<Support />} />
+            <Route
+              path="/health-memory"
+              element={
+                <ProtectedRoute>
+                  <HealthMemoryPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

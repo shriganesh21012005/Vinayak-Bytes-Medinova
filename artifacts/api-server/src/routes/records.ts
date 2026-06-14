@@ -6,6 +6,7 @@ import { HealthRecord } from "../models/HealthRecord";
 import { processFile } from "../lib/ocr";
 import { extractPrescriptionData } from "../lib/extraction";
 import { extractMemorySignals } from "../lib/memorySignals";
+import { updateHealthMemory } from "../lib/healthMemoryEngine";
 
 const router = Router();
 
@@ -101,6 +102,15 @@ router.post(
         ocr: ocrResult,
         extraction,
         memorySignals,
+      });
+
+      updateHealthMemory(
+        req.user.userId,
+        record._id.toString(),
+        memorySignals,
+        extraction.medicines
+      ).catch((err) => {
+        console.error("[health-memory] background update failed:", err);
       });
 
       res.status(200).json({

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Phone, Home, Users, Hospital, Ambulance, Heart, HeartPulse } from 'lucide-react';
+import { Menu, X, Phone, Home, Users, Hospital, Ambulance, Heart, HeartPulse, Brain } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import ProfileButton from '@/components/ProfileButton';
 
-// Updated nav links with the new support link
 const navLinks = [
   { name: 'Home', path: '/', icon: Home },
   { name: 'Doctors', path: '/doctors', icon: Users },
@@ -14,7 +13,8 @@ const navLinks = [
   { name: 'Ambulance', path: '/ambulance', icon: Ambulance },
   { name: 'PharmCare', path: '/medicare', icon: HeartPulse },
   { name: 'PathoCare', path: '/pathocare', icon: Heart },
-  { name: 'Support For Them', path: '/support', icon: Users }
+  { name: 'My Health', path: '/health-memory', icon: Brain },
+  { name: 'Support For Them', path: '/support', icon: Users },
 ];
 
 const NavigationHeader = () => {
