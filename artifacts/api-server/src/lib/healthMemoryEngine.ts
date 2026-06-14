@@ -38,7 +38,14 @@ function mergeMemoryItems(
   recordId: mongoose.Types.ObjectId,
   now: Date
 ): IMemoryItem[] {
-  const result = existing.map(item => ({ ...item }));
+  // Explicitly extract fields — spread on Mongoose subdocuments returns empty objects
+  // because schema fields live behind prototype getters, not as own enumerable props.
+  const result: IMemoryItem[] = existing.map(item => ({
+    value: item.value,
+    sourceRecordIds: [...(item.sourceRecordIds ?? [])],
+    firstSeenAt: item.firstSeenAt,
+    lastSeenAt: item.lastSeenAt,
+  }));
   const existingKeys = new Map(result.map((item, i) => [normalizeKey(item.value), i]));
 
   for (const val of newValues) {
@@ -74,7 +81,17 @@ function mergeMedications(
   recordId: mongoose.Types.ObjectId,
   now: Date
 ): IMedicationItem[] {
-  const result = existing.map(item => ({ ...item }));
+  // Explicitly extract fields — spread on Mongoose subdocuments returns empty objects
+  // because schema fields live behind prototype getters, not as own enumerable props.
+  const result: IMedicationItem[] = existing.map(item => ({
+    name: item.name,
+    dosage: item.dosage,
+    frequency: item.frequency,
+    confidence: item.confidence,
+    sourceRecordIds: [...(item.sourceRecordIds ?? [])],
+    firstSeenAt: item.firstSeenAt,
+    lastSeenAt: item.lastSeenAt,
+  }));
   const existingKeys = new Map(result.map((item, i) => [normalizeKey(item.name), i]));
 
   for (const med of newMeds) {
