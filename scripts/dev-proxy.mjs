@@ -1,8 +1,8 @@
 import http from "node:http";
 import net from "node:net";
 
-const TARGET = 5000;
-const PORT = 19579;
+const TARGET = 19579;
+const PORT = 5000;
 
 const server = http.createServer((req, res) => {
   const opts = {
@@ -36,6 +36,14 @@ server.on("upgrade", (req, socket, head) => {
   });
   conn.on("error", () => socket.destroy());
   socket.on("error", () => conn.destroy());
+});
+
+server.on("error", (err) => {
+  console.error("Proxy server error:", err.message);
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} already in use — exiting proxy`);
+    process.exit(1);
+  }
 });
 
 server.listen(PORT, "0.0.0.0", () => {

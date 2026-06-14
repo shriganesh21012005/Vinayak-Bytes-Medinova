@@ -5,7 +5,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
 
-const port = 5000;
+const port = 19579;
 
 export default defineConfig({
   base: "/",
