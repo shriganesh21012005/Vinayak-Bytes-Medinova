@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Brain, AlertTriangle, Activity, Pill, Syringe,
-  ShieldAlert, Zap, FileText, RefreshCw, Upload, CheckCircle, HelpCircle,
+  ShieldAlert, Zap, FileText, RefreshCw, Upload, CheckCircle, HelpCircle, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NavigationHeader from '@/components/NavigationHeader';
@@ -101,6 +101,23 @@ const SECTION_CONFIG = [
   },
 ];
 
+function ConfidenceBadge({ count }: { count: number }) {
+  if (count >= 2) {
+    return (
+      <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
+        <CheckCircle className="h-3 w-3" />
+        Confirmed
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 whitespace-nowrap">
+      <Clock className="h-3 w-3" />
+      Tentative
+    </span>
+  );
+}
+
 function MemoryItemCard({
   item,
   bg,
@@ -110,11 +127,14 @@ function MemoryItemCard({
   bg: string;
   border: string;
 }) {
-  const count = item.sourceRecordIds?.length ?? item.sourceCount;
+  const count = item.sourceRecordIds?.length ?? item.sourceCount ?? 0;
   return (
     <div className={`p-3 rounded-lg ${bg} border ${border}`}>
-      <p className="text-sm text-white">{item.value}</p>
-      {count != null && count > 0 && (
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-white flex-1">{item.value}</p>
+        <ConfidenceBadge count={count} />
+      </div>
+      {count > 0 && (
         <p className="text-xs text-white/30 mt-1">Seen in {count} record(s)</p>
       )}
     </div>

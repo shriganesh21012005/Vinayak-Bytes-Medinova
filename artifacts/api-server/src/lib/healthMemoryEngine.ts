@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { HealthMemory, type IHealthMemory, type IMemoryItem, type IMedicationItem } from "../models/HealthMemory";
 import { HealthRecord } from "../models/HealthRecord";
 import type { IMemorySignals, IMedicine } from "../models/HealthRecord";
+import { extractMemorySignals } from "./memorySignals";
 
 const SURGERY_KEYWORDS = [
   "surgery", "surgical", "operation", "operative", "resection",
@@ -261,13 +262,22 @@ export async function rebuildHealthMemoryForUser(userId: string): Promise<{
   let skipped = 0;
 
   for (const record of records) {
-    const memorySignals: IMemorySignals = record.memorySignals ?? {
-      allergiesFound: [],
-      conditionsFound: [],
-      medicationsFound: [],
-      criticalEventsFound: [],
-    };
     const medicines: IMedicine[] = record.extraction?.medicines ?? [];
+
+    // Re-run extraction from stored raw text so updated patterns (e.g. allergy
+    // regex fixes) are applied without needing to re-upload the file.
+    let memorySignals: IMemorySignals;
+    if (record.ocr?.rawText) {
+      const medicationNames = medicines.map(m => m.name);
+      memorySignals = extractMemorySignals(record.ocr.rawText, medicationNames);
+    } else {
+      memorySignals = record.memorySignals ?? {
+        allergiesFound: [],
+        conditionsFound: [],
+        medicationsFound: [],
+        criticalEventsFound: [],
+      };
+    }
 
     try {
       await updateHealthMemory(
