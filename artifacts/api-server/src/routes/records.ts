@@ -104,14 +104,16 @@ router.post(
         memorySignals,
       });
 
-      updateHealthMemory(
-        req.user.userId,
-        record._id.toString(),
-        memorySignals,
-        extraction.medicines
-      ).catch((err) => {
-        console.error("[health-memory] background update failed:", err);
-      });
+      try {
+        await updateHealthMemory(
+          req.user.userId,
+          record._id.toString(),
+          memorySignals,
+          extraction.medicines
+        );
+      } catch (memErr) {
+        console.error("[health-memory] update failed:", memErr);
+      }
 
       res.status(200).json({
         recordId: record._id,
