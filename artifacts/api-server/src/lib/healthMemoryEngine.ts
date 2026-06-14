@@ -242,6 +242,17 @@ export async function updateHealthMemory(
   memory.lastUpdatedByRecord = recordOid;
   memory.condensedProfile = buildCondensedProfile(memory);
 
+  // Mongoose 9 does not reliably detect direct array reassignment as modified
+  // on existing documents — explicitly mark every array field dirty so .save()
+  // always persists all data from every record, not just the first one.
+  memory.markModified("allergies");
+  memory.markModified("chronicConditions");
+  memory.markModified("surgeries");
+  memory.markModified("medicationRestrictions");
+  memory.markModified("criticalEvents");
+  memory.markModified("currentMedications");
+  memory.markModified("unverifiedMedications");
+
   await memory.save();
 }
 
