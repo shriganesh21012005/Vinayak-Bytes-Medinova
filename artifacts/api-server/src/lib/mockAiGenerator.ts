@@ -10,11 +10,13 @@ export interface StreamChunk {
 
 function detectIntent(query: string): string {
   const q = query.toLowerCase();
-  if (/symptom|feel|pain|hurt|ache|fever|cough|headache|nausea|dizzy|tired|fatigue|sore|vomit|diarrhea/.test(q)) return "symptoms";
+
+  // ── English patterns ──────────────────────────────────────────────────────
+  if (/symptom|feel sick|not feel|feel bad|feel well|pain|hurt|ache|fever|cough|headache|nausea|dizzy|tired|fatigue|sore|vomit|diarrhea|unwell|ill\b/.test(q)) return "symptoms";
   if (/medication|medicine|drug|pill|prescription|dosage|dose|tablet|capsule|supplement/.test(q)) return "medication";
-  if (/allerg|reaction|intolerance|hives|rash/.test(q)) return "allergy";
+  if (/allerg/.test(q)) return "allergy";
   if (/diet|nutrition|eat|food|weight|calorie|meal|vegetable|fruit/.test(q)) return "nutrition";
-  if (/exercise|workout|fitness|active|physical activity|gym|run|walk|sport/.test(q)) return "exercise";
+  if (/exercise|workout|fitness|active|physical activity|gym|run\b|walk|sport|danc|yoga|swimming|cycling/.test(q)) return "exercise";
   if (/stress|anxiety|depress|mental|mood|sleep|insomnia|worry|panic/.test(q)) return "mental_health";
   if (/appointment|schedule|book|visit/.test(q)) return "appointment";
   if (/doctor|specialist|physician|cardiolog|neurolog|dermato|orthoped/.test(q)) return "appointment";
@@ -24,6 +26,35 @@ function detectIntent(query: string): string {
   if (/hello|hi\b|hey\b|how are you|good morning|good evening/.test(q)) return "greeting";
   if (/thank/.test(q)) return "thanks";
   if (/clear|delete|reset|start over|new chat/.test(q)) return "clear";
+
+  // ── Bengali patterns (fallback when translation quota is exceeded) ─────────
+  // Symptoms: শরীর খারাপ, ব্যথা, জ্বর, মাথাব্যথা, বমি, কাশি, ক্লান্ত
+  if (/শরীর\s*খারাপ|ব্যথ|জ্বর|মাথাব্যথা|বমি|কাশি|ক্লান্ত|অসুস্থ|অসুখ|ব্যাথ/.test(query)) return "symptoms";
+  // Allergy: অ্যালার্জি
+  if (/অ্যালার্জি|এলার্জি/.test(query)) return "allergy";
+  // Medication: ওষুধ
+  if (/ওষুধ|ওষুধের|দওয়াই|ট্যাবলেট/.test(query)) return "medication";
+  // Exercise: ব্যায়াম, নাচ, যোগব্যায়াম, হাঁটা
+  if (/ব্যায়াম|নাচ|যোগ|হাঁটা|খেলাধুলা/.test(query)) return "exercise";
+  // Mental health: মানসিক, উদ্বেগ, বিষণ্নতা, ঘুম
+  if (/মানসিক|উদ্বেগ|বিষণ্ন|দুশ্চিন্তা|ঘুম/.test(query)) return "mental_health";
+  // Greeting: হ্যালো, হ্যালো, কেমন
+  if (/হ্যালো|হ্যালো|কেমন আছ|নমস্কার/.test(query)) return "greeting";
+
+  // ── Hindi patterns ────────────────────────────────────────────────────────
+  // Symptoms: शरीर, दर्द, बुखार, सिरदर्द, उल्टी, खांसी, थकान
+  if (/शरीर|दर्द|बुखार|सिरदर्द|उल्टी|खांसी|थकान|बीमार|अस्वस्थ/.test(query)) return "symptoms";
+  // Allergy: एलर्जी
+  if (/एलर्जी|अलेर्जी/.test(query)) return "allergy";
+  // Medication: दवाई, दवा, टैबलेट
+  if (/दवाई|दवा|टैबलेट|कैप्सूल|नुस्खा/.test(query)) return "medication";
+  // Exercise: व्यायाम, नाच, योग, चलना
+  if (/व्यायाम|नाच|योग|चलना|खेल/.test(query)) return "exercise";
+  // Mental health: मानसिक, चिंता, नींद
+  if (/मानसिक|चिंता|अवसाद|नींद|तनाव/.test(query)) return "mental_health";
+  // Greeting
+  if (/नमस्ते|हैलो|कैसे हैं/.test(query)) return "greeting";
+
   return "general";
 }
 
