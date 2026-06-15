@@ -42,66 +42,64 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  const send = (data: object) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
-    // ── Step 1: Detect language ──────────────────────────────────────────────
+    // ── Step 1: Detect language ───────────────────────────────────────────────
     const lang: SupportedLang = detectLanguage(trimmed);
     const apiKey = process.env["OPENAI_API_KEY"];
+    console.log(`[chat] LANG: ${lang} | msgLen: ${trimmed.length} | apiKey: ${apiKey ? "set" : "unset"}`);
 
-    // ── Step 2: Translate user message → English ─────────────────────────────
-    // We only call GPT for translation when AI_PROVIDER=openai (apiKey present)
-    const englishMessage =
-      lang === "en"
-        ? trimmed
-        : await translateToEnglish(trimmed, lang, apiKey).catch(() => trimmed);
+    // ── Step 2: Safety check on RAW input FIRST (no translation required) ────
+    // This runs immediately on native-script text. Bengali/Hindi emergency
+    // patterns in safetyLayer.ts are matched here — no GPT call needed at all.
+    const rawSafety = analyzeSafetyMultilingual(trimmed, trimmed);
+    console.log(`[chat] SAFETY_RAW: emergency=${rawSafety.isEmergency} keywords=[${rawSafety.emergencyKeywords.join(", ")}]`);
 
-    // ── Step 3: Persist the original (untranslated) user message ─────────────
-    let conversation = await ChatConversation.findOne({ userId: userOid });
-    if (!conversation) {
-      conversation = await ChatConversation.create({ userId: userOid });
-    }
-
-    await ChatMessage.create({
-      conversationId: conversation._id,
-      role: "user",
-      content: trimmed,
-    });
-
-    // ── Step 4: Emergency check on BOTH raw input and English translation ────
-    // Raw input catches native-script patterns (Bengali/Hindi) immediately,
-    // even before translation. English translation catches any patterns the
-    // native pass may have missed. Either hit triggers the emergency bypass.
-    const safety = analyzeSafetyMultilingual(trimmed, englishMessage);
-
-    if (safety.isEmergency) {
+    if (rawSafety.isEmergency) {
+      console.log(`[chat] EMERGENCY_TRIGGERED (raw) → sending ${lang} hardcoded response`);
       const emergencyText = EMERGENCY_RESPONSES[lang];
-
-      // Persist the hardcoded emergency assistant response
-      await ChatMessage.create({
-        conversationId: conversation._id,
-        role: "assistant",
-        content: emergencyText,
-      });
-
-      await ChatConversation.updateOne(
-        { _id: conversation._id },
-        { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
-      );
-
-      send({ type: "chunk", content: emergencyText });
-      send({ type: "done" });
+      await _persistAndClose(userOid, trimmed, emergencyText, send);
       return;
     }
 
-    // ── Step 5: Load context (conversation history + health memory) ──────────
+    // ── Step 3: Translate to English for AI pipeline ──────────────────────────
+    let englishMessage: string;
+    if (lang === "en" || !apiKey) {
+      // No translation available (English user, or mock mode without API key)
+      englishMessage = trimmed;
+    } else {
+      try {
+        englishMessage = await translateToEnglish(trimmed, lang, apiKey);
+        console.log(`[chat] TRANSLATED_TO_EN: "${englishMessage.slice(0, 80)}..."`);
+      } catch (err) {
+        console.error("[chat] translateToEnglish failed — using raw text:", err);
+        englishMessage = trimmed; // use raw; safety will still run on it
+      }
+    }
+
+    // ── Step 4: Safety check again on English translation ────────────────────
+    // Catches cases where the English translation reveals emergency keywords
+    // that the native-script pass may have missed.
+    if (englishMessage !== trimmed) {
+      const enSafety = analyzeSafetyMultilingual(englishMessage, englishMessage);
+      console.log(`[chat] SAFETY_EN: emergency=${enSafety.isEmergency} keywords=[${enSafety.emergencyKeywords.join(", ")}]`);
+      if (enSafety.isEmergency) {
+        console.log(`[chat] EMERGENCY_TRIGGERED (english translation) → sending ${lang} hardcoded response`);
+        const emergencyText = EMERGENCY_RESPONSES[lang];
+        await _persistAndClose(userOid, trimmed, emergencyText, send);
+        return;
+      }
+    }
+
+    // ── Step 5: Persist user message & load context ───────────────────────────
+    let conversation = await ChatConversation.findOne({ userId: userOid });
+    if (!conversation) conversation = await ChatConversation.create({ userId: userOid });
+
+    await ChatMessage.create({ conversationId: conversation._id, role: "user", content: trimmed });
+
     const recentDocs = await ChatMessage.find(
-      {
-        conversationId: conversation._id,
-        role: { $in: ["user", "assistant"] },
-      },
+      { conversationId: conversation._id, role: { $in: ["user", "assistant"] } },
       { role: 1, content: 1, createdAt: 1 }
     )
       .sort({ createdAt: -1 })
@@ -118,78 +116,100 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       generateClinicalSummary(userId).catch(() => null),
     ]);
 
-    // ── Step 6: Run AI pipeline (always in English) ──────────────────────────
+    // ── Step 6: Run AI pipeline (always in English internally) ───────────────
     let fullContent = "";
 
-    if (lang === "en") {
-      // Native English — stream chunks directly for lowest latency
-      for await (const chunk of generateStream(
-        englishMessage,
-        memory,
-        history,
-        clinicalSummary ?? undefined
-      )) {
-        if (chunk.type === "chunk" && chunk.content) {
-          fullContent += chunk.content;
-          send(chunk);
-        } else if (chunk.type === "done") {
-          if (fullContent) {
-            await ChatMessage.create({
-              conversationId: conversation._id,
-              role: "assistant",
-              content: fullContent,
-            });
-            await ChatConversation.updateOne(
-              { _id: conversation._id },
-              { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
-            );
-          }
-          send({ type: "done" });
-        }
+    for await (const chunk of generateStream(englishMessage, memory, history, clinicalSummary ?? undefined)) {
+      if (chunk.type === "chunk" && chunk.content) {
+        fullContent += chunk.content;
+        // For English users we can stream; for non-English we buffer first
+        if (lang === "en") send(chunk);
       }
-    } else {
-      // Non-English — buffer full response, then translate, then send as one chunk
-      for await (const chunk of generateStream(
-        englishMessage,
-        memory,
-        history,
-        clinicalSummary ?? undefined
-      )) {
-        if (chunk.type === "chunk" && chunk.content) {
-          fullContent += chunk.content;
-        }
-      }
-
-      if (fullContent) {
-        // ── Step 7: Translate response → user's language ──────────────────────
-        const translatedResponse = await translateFromEnglish(
-          fullContent,
-          lang,
-          apiKey
-        ).catch(() => fullContent); // fallback: send English on translation error
-
-        await ChatMessage.create({
-          conversationId: conversation._id,
-          role: "assistant",
-          content: translatedResponse,
-        });
-
-        await ChatConversation.updateOne(
-          { _id: conversation._id },
-          { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
-        );
-
-        send({ type: "chunk", content: translatedResponse });
-      }
-
-      send({ type: "done" });
     }
+
+    if (!fullContent) {
+      send({ type: "done" });
+      return;
+    }
+
+    // ── Step 7: Translate response → user's language (MANDATORY for non-EN) ──
+    let finalResponse: string;
+
+    if (lang === "en" || !apiKey) {
+      // English user, or no API key (mock mode) — no translation possible
+      finalResponse = fullContent;
+      console.log(`[chat] TRANSLATION_SKIPPED (lang=${lang}, apiKey=${apiKey ? "set" : "unset"})`);
+    } else {
+      try {
+        finalResponse = await translateFromEnglish(fullContent, lang, apiKey);
+        console.log(`[chat] FINAL_TRANSLATION_APPLIED (${lang}): "${finalResponse.slice(0, 80)}..."`);
+      } catch (err) {
+        // Translation failed — log loudly; still send English rather than nothing
+        console.error(`[chat] translateFromEnglish FAILED for lang=${lang}:`, err);
+        finalResponse = fullContent;
+      }
+    }
+
+    // For non-English users, we buffered — now send the translated response
+    if (lang !== "en") {
+      send({ type: "chunk", content: finalResponse });
+    }
+
+    // ── Step 8: Persist assistant response ───────────────────────────────────
+    await ChatMessage.create({ conversationId: conversation._id, role: "assistant", content: finalResponse });
+    await ChatConversation.updateOne(
+      { _id: conversation._id },
+      { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
+    );
+
+    send({ type: "done" });
+
   } catch (err) {
+    console.error("[chat] Unhandled error in /send:", err);
     send({ type: "error", message: "Something went wrong. Please try again." });
   } finally {
     res.end();
   }
 });
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function _persistAndClose(
+  userOid: mongoose.Types.ObjectId,
+  userMessage: string,
+  assistantMessage: string,
+  send: (data: object) => void
+): Promise<void> {
+  try {
+    let conversation = await ChatConversation.findOne({ userId: userOid });
+    if (!conversation) conversation = await ChatConversation.create({ userId: userOid });
+
+    // Check if user message was already persisted (emergency short-circuit)
+    const lastUserMsg = await ChatMessage.findOne(
+      { conversationId: conversation._id, role: "user" },
+      {},
+      { sort: { createdAt: -1 } }
+    ).lean();
+
+    const alreadyPersisted = lastUserMsg?.content === userMessage;
+    if (!alreadyPersisted) {
+      await ChatMessage.create({ conversationId: conversation._id, role: "user", content: userMessage });
+    }
+
+    await ChatMessage.create({ conversationId: conversation._id, role: "assistant", content: assistantMessage });
+    await ChatConversation.updateOne(
+      { _id: conversation._id },
+      { $inc: { messageCount: alreadyPersisted ? 1 : 2 }, $set: { lastMessageAt: new Date() } }
+    );
+  } catch (err) {
+    console.error("[chat] _persistAndClose DB error:", err);
+  }
+
+  send({ type: "chunk", content: assistantMessage });
+  send({ type: "done" });
+}
+
+// ─── History & Clear ──────────────────────────────────────────────────────────
 
 router.get("/history", async (req: AuthRequest, res: Response) => {
   const userId = req.user!.userId;
@@ -211,10 +231,7 @@ router.get("/history", async (req: AuthRequest, res: Response) => {
       .limit(limit)
       .lean();
 
-    res.json({
-      conversationId: conversation._id,
-      messages: messages.reverse(),
-    });
+    res.json({ conversationId: conversation._id, messages: messages.reverse() });
   } catch {
     res.status(500).json({ error: "Failed to load chat history" });
   }
