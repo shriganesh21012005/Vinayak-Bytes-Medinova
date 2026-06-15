@@ -13,7 +13,7 @@ import {
   EMERGENCY_RESPONSES,
   type SupportedLang,
 } from "../lib/multilingualService";
-import { analyzeSafety } from "../lib/safetyLayer";
+import { analyzeSafetyMultilingual } from "../lib/safetyLayer";
 
 const router = Router();
 
@@ -70,8 +70,11 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       content: trimmed,
     });
 
-    // ── Step 4: Emergency check (on English text — patterns are English) ─────
-    const safety = analyzeSafety(englishMessage);
+    // ── Step 4: Emergency check on BOTH raw input and English translation ────
+    // Raw input catches native-script patterns (Bengali/Hindi) immediately,
+    // even before translation. English translation catches any patterns the
+    // native pass may have missed. Either hit triggers the emergency bypass.
+    const safety = analyzeSafetyMultilingual(trimmed, englishMessage);
 
     if (safety.isEmergency) {
       const emergencyText = EMERGENCY_RESPONSES[lang];
