@@ -9,9 +9,12 @@ export interface SafetyAnalysis {
 // Lowercase + collapse whitespace. We intentionally keep Unicode letters so
 // Bengali/Hindi script characters are preserved for pattern matching.
 function normalize(text: string): string {
+  // \p{L} = Unicode letters, \p{M} = combining marks (REQUIRED for Indic scripts:
+  // Bengali virama ্ U+09CD, Hindi vowel signs ी ु etc are category Mn/Mc — not \p{L}).
+  // Without \p{M}, "ব্যথা" → "বযথা" and "सीने" → "सन", breaking all native-script patterns.
   return text
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ") // remove punctuation, keep letters/numbers/spaces
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ") // preserve letters + marks + digits + spaces
     .replace(/\s+/g, " ")
     .trim();
 }
