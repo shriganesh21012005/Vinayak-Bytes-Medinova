@@ -12,26 +12,26 @@ export async function* generateStream(
   history: ChatHistoryMessage[] = [],
   clinicalSummary?: IClinicalSummary
 ): AsyncGenerator<StreamChunk> {
-  const provider = (process.env["AI_PROVIDER"] ?? "mock").toLowerCase().trim();
-
-  if (provider !== "openai") {
-    yield* generateMockStream(userMessage, memory);
-    return;
-  }
-
   const apiKey = process.env["OPENAI_API_KEY"];
-  if (!apiKey) {
-    console.warn(
-      "[ai-provider] AI_PROVIDER=openai but OPENAI_API_KEY is not set — falling back to mock"
-    );
+  const explicitProvider = (process.env["AI_PROVIDER"] ?? "").toLowerCase().trim();
+
+  // Use OpenAI when:
+  //   a) OPENAI_API_KEY is present (auto-enable), OR
+  //   b) AI_PROVIDER=openai is explicitly set
+  // Use mock only when no API key is available.
+  const useOpenAI = !!apiKey && explicitProvider !== "mock";
+
+  if (!useOpenAI) {
+    console.log("[ai-provider] Using mock AI (no OPENAI_API_KEY or AI_PROVIDER=mock)");
     yield* generateMockStream(userMessage, memory);
     return;
   }
 
+  console.log("[ai-provider] Using GPT-4o-mini");
   let sentAnyChunk = false;
 
   try {
-    for await (const chunk of generateOpenAIStream(userMessage, memory, history, apiKey, clinicalSummary)) {
+    for await (const chunk of generateOpenAIStream(userMessage, memory, history, apiKey!, clinicalSummary)) {
       if (chunk.type === "chunk") sentAnyChunk = true;
       yield chunk;
     }
@@ -41,11 +41,9 @@ export async function* generateStream(
     console.error(`[ai-provider] OpenAI ${errName}: ${errMsg}`);
 
     if (!sentAnyChunk) {
-      // Nothing streamed yet — fall back to mock transparently
       console.warn("[ai-provider] Falling back to mock (no output sent yet)");
       yield* generateMockStream(userMessage, memory);
     } else {
-      // Already sent partial content — end cleanly rather than mix providers
       console.warn("[ai-provider] Mid-stream failure — ending response early");
       yield { type: "done" };
     }

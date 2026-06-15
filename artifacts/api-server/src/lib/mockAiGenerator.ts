@@ -12,7 +12,7 @@ function detectIntent(query: string): string {
   const q = query.toLowerCase();
   if (/symptom|feel|pain|hurt|ache|fever|cough|headache|nausea|dizzy|tired|fatigue|sore|vomit|diarrhea/.test(q)) return "symptoms";
   if (/medication|medicine|drug|pill|prescription|dosage|dose|tablet|capsule|supplement/.test(q)) return "medication";
-  if (/allergy|allergic|reaction|intolerance|hives|rash/.test(q)) return "allergy";
+  if (/allerg|reaction|intolerance|hives|rash/.test(q)) return "allergy";
   if (/diet|nutrition|eat|food|weight|calorie|meal|vegetable|fruit/.test(q)) return "nutrition";
   if (/exercise|workout|fitness|active|physical activity|gym|run|walk|sport/.test(q)) return "exercise";
   if (/stress|anxiety|depress|mental|mood|sleep|insomnia|worry|panic/.test(q)) return "mental_health";
