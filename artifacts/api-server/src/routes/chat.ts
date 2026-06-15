@@ -6,6 +6,14 @@ import { ChatMessage } from "../models/ChatMessage";
 import { HealthMemory } from "../models/HealthMemory";
 import { generateStream, type ChatHistoryMessage } from "../lib/aiProvider";
 import { generateClinicalSummary } from "../lib/clinicalSummaryEngine";
+import {
+  detectLanguage,
+  translateToEnglish,
+  translateFromEnglish,
+  EMERGENCY_RESPONSES,
+  type SupportedLang,
+} from "../lib/multilingualService";
+import { analyzeSafety } from "../lib/safetyLayer";
 
 const router = Router();
 
@@ -39,21 +47,53 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
   };
 
   try {
+    // ── Step 1: Detect language ──────────────────────────────────────────────
+    const lang: SupportedLang = detectLanguage(trimmed);
+    const apiKey = process.env["OPENAI_API_KEY"];
+
+    // ── Step 2: Translate user message → English ─────────────────────────────
+    // We only call GPT for translation when AI_PROVIDER=openai (apiKey present)
+    const englishMessage =
+      lang === "en"
+        ? trimmed
+        : await translateToEnglish(trimmed, lang, apiKey).catch(() => trimmed);
+
+    // ── Step 3: Persist the original (untranslated) user message ─────────────
     let conversation = await ChatConversation.findOne({ userId: userOid });
     if (!conversation) {
       conversation = await ChatConversation.create({ userId: userOid });
     }
 
-    // Save user message first
     await ChatMessage.create({
       conversationId: conversation._id,
       role: "user",
       content: trimmed,
     });
 
-    // Load recent conversation history for AI context (last 10 exchanges).
-    // We fetch 11 descending, reverse to chronological, then drop the last
-    // entry (the user message we just saved) so we pass only prior turns.
+    // ── Step 4: Emergency check (on English text — patterns are English) ─────
+    const safety = analyzeSafety(englishMessage);
+
+    if (safety.isEmergency) {
+      const emergencyText = EMERGENCY_RESPONSES[lang];
+
+      // Persist the hardcoded emergency assistant response
+      await ChatMessage.create({
+        conversationId: conversation._id,
+        role: "assistant",
+        content: emergencyText,
+      });
+
+      await ChatConversation.updateOne(
+        { _id: conversation._id },
+        { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
+      );
+
+      send({ type: "chunk", content: emergencyText });
+      send({ type: "done" });
+      return;
+    }
+
+    // ── Step 5: Load context (conversation history + health memory) ──────────
     const recentDocs = await ChatMessage.find(
       {
         conversationId: conversation._id,
@@ -75,31 +115,71 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       generateClinicalSummary(userId).catch(() => null),
     ]);
 
+    // ── Step 6: Run AI pipeline (always in English) ──────────────────────────
     let fullContent = "";
 
-    for await (const chunk of generateStream(trimmed, memory, history, clinicalSummary ?? undefined)) {
-      if (chunk.type === "chunk" && chunk.content) {
-        fullContent += chunk.content;
-        send(chunk);
-      } else if (chunk.type === "done") {
-        if (fullContent) {
-          await ChatMessage.create({
-            conversationId: conversation._id,
-            role: "assistant",
-            content: fullContent,
-          });
-
-          await ChatConversation.updateOne(
-            { _id: conversation._id },
-            {
-              $inc: { messageCount: 2 },
-              $set: { lastMessageAt: new Date() },
-            }
-          );
+    if (lang === "en") {
+      // Native English — stream chunks directly for lowest latency
+      for await (const chunk of generateStream(
+        englishMessage,
+        memory,
+        history,
+        clinicalSummary ?? undefined
+      )) {
+        if (chunk.type === "chunk" && chunk.content) {
+          fullContent += chunk.content;
+          send(chunk);
+        } else if (chunk.type === "done") {
+          if (fullContent) {
+            await ChatMessage.create({
+              conversationId: conversation._id,
+              role: "assistant",
+              content: fullContent,
+            });
+            await ChatConversation.updateOne(
+              { _id: conversation._id },
+              { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
+            );
+          }
+          send({ type: "done" });
         }
-
-        send({ type: "done" });
       }
+    } else {
+      // Non-English — buffer full response, then translate, then send as one chunk
+      for await (const chunk of generateStream(
+        englishMessage,
+        memory,
+        history,
+        clinicalSummary ?? undefined
+      )) {
+        if (chunk.type === "chunk" && chunk.content) {
+          fullContent += chunk.content;
+        }
+      }
+
+      if (fullContent) {
+        // ── Step 7: Translate response → user's language ──────────────────────
+        const translatedResponse = await translateFromEnglish(
+          fullContent,
+          lang,
+          apiKey
+        ).catch(() => fullContent); // fallback: send English on translation error
+
+        await ChatMessage.create({
+          conversationId: conversation._id,
+          role: "assistant",
+          content: translatedResponse,
+        });
+
+        await ChatConversation.updateOne(
+          { _id: conversation._id },
+          { $inc: { messageCount: 2 }, $set: { lastMessageAt: new Date() } }
+        );
+
+        send({ type: "chunk", content: translatedResponse });
+      }
+
+      send({ type: "done" });
     }
   } catch (err) {
     send({ type: "error", message: "Something went wrong. Please try again." });

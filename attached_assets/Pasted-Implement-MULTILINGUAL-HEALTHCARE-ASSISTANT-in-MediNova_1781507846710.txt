@@ -1,0 +1,162 @@
+Implement MULTILINGUAL HEALTHCARE ASSISTANT in MediNova.
+
+==================================================
+FEATURE: MULTILINGUAL AI HEALTH ASSISTANT
+==================================================
+
+Supported languages:
+- English
+- Hindi
+- Bengali
+
+==================================================
+CORE ARCHITECTURE
+==================================================
+
+User Message Flow:
+
+User Input (any supported language)
+        ↓
+1. Language Detection
+        ↓
+2. Translate to English
+        ↓
+3. Inject into existing AI pipeline (GPT-4o-mini + HealthMemory)
+        ↓
+4. Get AI response in English
+        ↓
+5. Translate response back to original language
+        ↓
+6. Show to user
+
+==================================================
+IMPLEMENTATION REQUIREMENTS
+==================================================
+
+1. CREATE NEW FILE:
+/ lib / multilingualService.ts
+
+Functions:
+
+detectLanguage(text) -> "en" | "hi" | "bn"
+
+translateToEnglish(text, lang)
+
+translateFromEnglish(text, lang)
+
+==================================================
+2. LANGUAGE DETECTION LOGIC
+
+Use simple rule-based + fallback:
+
+- Hindi: Devanagari Unicode range
+- Bengali: Bangla Unicode range
+- Default: English
+
+==================================================
+3. TRANSLATION ENGINE
+
+Use one of:
+- OpenAI GPT-4o-mini (preferred, already available)
+OR
+- lightweight translation prompts
+
+Prompt for translation:
+
+"You are a translation engine. Translate the following text to English. Preserve medical meaning."
+
+and reverse:
+
+"Translate this response into {target language}. Keep it medically safe and simple."
+
+==================================================
+4. INTEGRATION POINT
+
+Modify:
+
+/routes/chat.ts
+
+Before sending message to AI:
+
+Step 1:
+const lang = detectLanguage(userMessage)
+
+Step 2:
+const englishMessage = translateToEnglish(userMessage, lang)
+
+Step 3:
+Send englishMessage to existing:
+- HealthMemory system
+- ClinicalSummaryEngine
+- GPT-4o-mini
+
+Step 4:
+Get response in English
+
+Step 5:
+const finalResponse = translateFromEnglish(response, lang)
+
+Step 6:
+Return finalResponse to frontend
+
+==================================================
+5. HEALTH SAFETY RULES (IMPORTANT)
+
+The system MUST ALWAYS enforce:
+
+- No diagnosis
+- No prescriptions
+- No treatment instructions
+
+Even in translated output.
+
+Translations must NOT:
+- add new medical meaning
+- change safety messages
+- weaken emergency warnings
+
+==================================================
+6. HEALTH MEMORY INTEGRATION
+
+Even when user speaks Hindi/Bengali:
+- HealthMemory must still be queried in English system context
+- Clinical Summary remains English internally
+- Only UI translation layer changes
+
+==================================================
+7. EMERGENCY HANDLING (CRITICAL)
+
+If emergency detected (chest pain, breathing issues, suicide risk):
+
+DO NOT translate loosely.
+
+Always return hardcoded multilingual emergency response:
+
+English:
+"Call emergency services immediately"
+
+Hindi:
+"कृपया तुरंत आपातकालीन सेवाओं को कॉल करें"
+
+Bengali:
+"অনুগ্রহ করে অবিলম্বে জরুরি সেবায় কল করুন"
+
+==================================================
+8. PERFORMANCE REQUIREMENT
+
+- Must not double API latency significantly
+- Translation should be lightweight
+- Cache repeated translations if possible
+
+==================================================
+END GOAL
+
+User should be able to:
+
+- type in Hindi / Bengali / English
+- get medically safe response
+- see response in same language
+- still use full HealthMemory + Clinical Summary system
+
+DO NOT modify authentication or database schema.
+ONLY ADD multilingual translation layer on top of existing AI system.
