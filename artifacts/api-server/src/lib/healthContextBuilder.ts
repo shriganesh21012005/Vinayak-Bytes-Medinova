@@ -1,4 +1,7 @@
 import type { IHealthMemory } from "../models/HealthMemory";
+import { sanitizeClinicalContext } from "./clinicalSafetyGuard";
+import { buildSafeClinicalPrompt } from "./clinicalPromptGuard";
+import type { IClinicalSummary } from "../models/ClinicalSummaryCache";
 
 export interface HealthContextSummary {
   hasMedicalData: boolean;
@@ -96,12 +99,15 @@ export function buildHealthContextBlock(memory: IHealthMemory | null): string {
   return lines.join("\n");
 }
 
-export function buildSystemPrompt(memory: IHealthMemory | null, clinicalSummaryBlock?: string): string {
+export function buildSystemPrompt(memory: IHealthMemory | null, rawClinicalSummary?: IClinicalSummary): string {
   const healthBlock = buildHealthContextBlock(memory);
 
-  const clinicalSection = clinicalSummaryBlock
-    ? `\n\n${clinicalSummaryBlock}\n`
-    : "";
+  let clinicalSection = "";
+  if (rawClinicalSummary) {
+    const sanitized = sanitizeClinicalContext(rawClinicalSummary);
+    const safeBlock = buildSafeClinicalPrompt(sanitized);
+    clinicalSection = `\n\n${safeBlock}\n`;
+  }
 
   return `You are MediNova AI, a personal health assistant integrated with the user's personal health records. Your role is to help users understand their health information, answer general health questions, and guide them toward appropriate professional care.
 

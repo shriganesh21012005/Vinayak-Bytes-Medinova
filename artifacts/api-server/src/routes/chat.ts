@@ -5,7 +5,7 @@ import { ChatConversation } from "../models/ChatConversation";
 import { ChatMessage } from "../models/ChatMessage";
 import { HealthMemory } from "../models/HealthMemory";
 import { generateStream, type ChatHistoryMessage } from "../lib/aiProvider";
-import { generateClinicalSummary, formatClinicalSummaryForPrompt } from "../lib/clinicalSummaryEngine";
+import { generateClinicalSummary } from "../lib/clinicalSummaryEngine";
 
 const router = Router();
 
@@ -75,13 +75,9 @@ router.post("/send", async (req: AuthRequest, res: Response) => {
       generateClinicalSummary(userId).catch(() => null),
     ]);
 
-    const clinicalSummaryBlock = clinicalSummary
-      ? formatClinicalSummaryForPrompt(clinicalSummary)
-      : undefined;
-
     let fullContent = "";
 
-    for await (const chunk of generateStream(trimmed, memory, history, clinicalSummaryBlock)) {
+    for await (const chunk of generateStream(trimmed, memory, history, clinicalSummary ?? undefined)) {
       if (chunk.type === "chunk" && chunk.content) {
         fullContent += chunk.content;
         send(chunk);

@@ -16,6 +16,7 @@ import Hospital from "./pages/Hospital";
 import Ambulance from "./pages/Ambulance";
 import Support from "./pages/Support";
 import HealthMemoryPage from "./pages/HealthMemory";
+import DoctorDashboard from "./pages/DoctorDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <HealthMemoryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/doctor-dashboard"
+              element={
+                <ProtectedRoute>
+                  <DoctorDashboard />
                 </ProtectedRoute>
               }
             />

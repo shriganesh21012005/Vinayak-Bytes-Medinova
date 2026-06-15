@@ -1,0 +1,174 @@
+Implement TWO features in MediNova:
+
+==================================================
+PHASE 6A: CLINICAL SAFETY GUARD LAYER (CRITICAL)
+==================================================
+
+Goal:
+Prevent GPT from over-interpreting medical data from Clinical Summary Engine.
+
+We already have:
+- HealthMemory
+- ClinicalSummaryEngine
+- GPT-4o-mini chat
+
+Now add a strict “DATA-ONLY MEDICAL MODE”.
+
+--------------------------------------------------
+CREATE NEW FILE:
+--------------------------------------------------
+/lib/clinicalSafetyGuard.ts
+
+--------------------------------------------------
+FUNCTION:
+--------------------------------------------------
+sanitizeClinicalContext(summary: ClinicalSummary)
+
+RULES:
+
+1. REMOVE AI INTERPRETATION RISK
+   - Delete any field that implies reasoning like:
+     - "riskLevel"
+     - "diagnosis"
+     - "suggestedDisease"
+     - "interpretation"
+
+2. KEEP ONLY FACTUAL DATA:
+   - allergies
+   - medications
+   - conditions
+   - medicalEvents
+
+3. OUTPUT MUST BE STRICT JSON ONLY
+
+--------------------------------------------------
+CREATE SYSTEM PROMPT WRAPPER:
+--------------------------------------------------
+/lib/clinicalPromptGuard.ts
+
+Function:
+buildSafeClinicalPrompt(summary)
+
+It must return:
+
+"""
+You are a medical assistant operating in DATA-ONLY MODE.
+
+IMPORTANT RULES:
+- Do NOT diagnose
+- Do NOT infer diseases
+- Do NOT predict conditions
+- Only use provided clinical facts
+- If unsure, say "insufficient data"
+- Never extend medical meaning beyond given data
+
+CLINICAL DATA:
+{SANITIZED_JSON}
+"""
+
+--------------------------------------------------
+INTEGRATION:
+--------------------------------------------------
+
+Modify:
+- healthContextBuilder.ts
+
+Replace raw Clinical Summary injection with:
+
+sanitizeClinicalContext(summary)
+
+Then pass into buildSafeClinicalPrompt()
+
+--------------------------------------------------
+HARD SAFETY RULE:
+--------------------------------------------------
+
+Even if user asks:
+- "What disease do I have?"
+- "Am I at risk?"
+- "What will happen to me?"
+
+AI must ONLY respond using:
+- factual list from summary
+- no interpretation
+
+==================================================
+PHASE 6B: DOCTOR DASHBOARD UI (DEMO FEATURE)
+==================================================
+
+Goal:
+Create a clean doctor-facing UI dashboard for hackathon demo.
+
+--------------------------------------------------
+CREATE FRONTEND PAGE:
+--------------------------------------------------
+/frontend/pages/DoctorDashboard.tsx
+
+Route:
+/doctor-dashboard
+
+--------------------------------------------------
+UI SECTIONS:
+--------------------------------------------------
+
+1. PATIENT HEADER CARD
+- Name (mock if not available)
+- Age (if available)
+- Total records uploaded
+- Last updated date
+
+2. MEDICAL SUMMARY PANEL
+Fetch:
+GET /api/clinical-summary
+
+Display:
+- Allergies
+- Chronic Conditions
+- Medications
+- Medical Events
+- Restrictions
+
+3. RISK FLAGS PANEL (UI ONLY)
+Derive simple UI flags (NOT AI):
+- Diabetes → "Glucose Monitoring Required"
+- Hypertension → "BP Monitoring Required"
+- Multiple medications → "Polypharmacy Alert"
+
+(These are static UI rules, NOT AI predictions)
+
+4. MEDICATION TIMELINE CHART
+Use charts_widget_v2
+
+Show:
+- medication name vs frequency count OR occurrence
+
+5. HEALTH HISTORY TIMELINE (SIMULATED)
+Create a simple timeline UI:
+- Upload events
+- Medication added events
+- Condition detected events
+
+--------------------------------------------------
+IMPORTANT FOR DEMO:
+--------------------------------------------------
+
+- Must look clean and medical-grade
+- Must load in <2 seconds
+- Must NOT break backend
+- Must use cached API when possible
+
+==================================================
+FINAL GOAL
+==================================================
+
+This is a hackathon demo system.
+
+We need:
+- Safe AI medical reasoning (no hallucination risk)
+- Doctor dashboard UI that looks production-ready
+- Fast response time
+- Clean structured medical output
+
+DO NOT change authentication system.
+DO NOT change database schema unless required.
+ONLY ADD FEATURES.

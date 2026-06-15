@@ -1,4 +1,5 @@
 import type { IHealthMemory } from "../models/HealthMemory";
+import type { IClinicalSummary } from "../models/ClinicalSummaryCache";
 import { generateMockStream } from "./mockAiGenerator";
 import { generateOpenAIStream } from "./openaiProvider";
 import type { StreamChunk, ChatHistoryMessage } from "./openaiProvider";
@@ -9,7 +10,7 @@ export async function* generateStream(
   userMessage: string,
   memory: IHealthMemory | null,
   history: ChatHistoryMessage[] = [],
-  clinicalSummaryBlock?: string
+  clinicalSummary?: IClinicalSummary
 ): AsyncGenerator<StreamChunk> {
   const provider = (process.env["AI_PROVIDER"] ?? "mock").toLowerCase().trim();
 
@@ -30,7 +31,7 @@ export async function* generateStream(
   let sentAnyChunk = false;
 
   try {
-    for await (const chunk of generateOpenAIStream(userMessage, memory, history, apiKey, clinicalSummaryBlock)) {
+    for await (const chunk of generateOpenAIStream(userMessage, memory, history, apiKey, clinicalSummary)) {
       if (chunk.type === "chunk") sentAnyChunk = true;
       yield chunk;
     }

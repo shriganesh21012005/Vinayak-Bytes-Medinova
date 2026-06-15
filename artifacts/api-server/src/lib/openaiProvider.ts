@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { analyzeSafety } from "./safetyLayer";
 import { buildSystemPrompt } from "./healthContextBuilder";
 import type { IHealthMemory } from "../models/HealthMemory";
+import type { IClinicalSummary } from "../models/ClinicalSummaryCache";
 import type { StreamChunk } from "./mockAiGenerator";
 
 export type { StreamChunk };
@@ -53,7 +54,7 @@ export async function* generateOpenAIStream(
   memory: IHealthMemory | null,
   history: ChatHistoryMessage[],
   apiKey: string,
-  clinicalSummaryBlock?: string
+  clinicalSummary?: IClinicalSummary
 ): AsyncGenerator<StreamChunk> {
   // Safety layer — always enforced regardless of AI provider
   const safety = analyzeSafety(userMessage);
@@ -75,7 +76,7 @@ export async function* generateOpenAIStream(
 
   const client = new OpenAI({ apiKey, timeout: 30_000 });
 
-  const systemPrompt = buildSystemPrompt(memory, clinicalSummaryBlock);
+  const systemPrompt = buildSystemPrompt(memory, clinicalSummary);
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
