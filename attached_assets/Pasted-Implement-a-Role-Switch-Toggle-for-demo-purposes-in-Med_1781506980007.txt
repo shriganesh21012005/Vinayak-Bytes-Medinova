@@ -1,0 +1,110 @@
+Implement a “Role Switch Toggle” for demo purposes in MediNova.
+
+==================================================
+FEATURE: PATIENT ↔ DOCTOR DEMO MODE SWITCH
+==================================================
+
+Goal:
+Allow a logged-in user to switch UI mode between:
+- Patient Mode (default)
+- Doctor Mode (dashboard view)
+
+This is ONLY a frontend demo feature.
+It must NOT affect authentication or backend security.
+
+==================================================
+IMPLEMENTATION
+==================================================
+
+1. CREATE GLOBAL UI STATE
+
+Add a simple UI state store:
+
+/frontend/store/roleStore.ts
+
+Use React Context or Zustand (prefer existing project pattern).
+
+State:
+- role: "patient" | "doctor"
+- setRole()
+
+Persist in:
+- localStorage ("medinova_role")
+
+Default:
+- "patient"
+
+==================================================
+2. ADD ROLE TOGGLE UI
+
+Create component:
+
+/frontend/components/RoleToggle.tsx
+
+UI:
+- Toggle switch or segmented control
+- Labels:
+  "Patient View" | "Doctor View"
+
+Place it in:
+- Navbar OR top-right header (visible everywhere)
+
+==================================================
+3. ROUTING BEHAVIOR (IMPORTANT)
+
+Modify routing logic in App.tsx:
+
+If role === "doctor":
+  Redirect default route to:
+    /doctor-dashboard
+
+If role === "patient":
+  Keep normal home/chat view
+
+BUT:
+DO NOT block manual navigation to routes.
+
+==================================================
+4. DOCTOR DASHBOARD ACCESS RULE
+
+Update ProtectedRoute behavior:
+
+Allow access to:
+/doctor-dashboard
+
+But add UI hint:
+
+"If role === patient, show banner:
+ 'Switch to Doctor Mode to view clinical dashboard'"
+
+==================================================
+5. OPTIONAL UX IMPROVEMENT
+
+When switching roles:
+- Smooth transition animation
+- Toast message:
+  "Switched to Doctor Mode"
+  "Switched to Patient Mode"
+
+==================================================
+6. IMPORTANT SAFETY NOTE
+
+This is ONLY a UI demo toggle.
+DO NOT:
+- change JWT auth
+- change backend authorization
+- treat roles as security roles
+
+It is purely:
+👉 presentation layer switching
+
+==================================================
+END GOAL
+
+Judge should be able to:
+- login once
+- toggle role
+- instantly see doctor dashboard
+- switch back to patient chat
+
+This should feel like a hospital-grade dual interface system.

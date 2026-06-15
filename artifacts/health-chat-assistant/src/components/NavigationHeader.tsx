@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import ProfileButton from '@/components/ProfileButton';
+import RoleToggle from '@/components/RoleToggle';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navLinks = [
   { name: 'Home', path: '/', icon: Home },
@@ -20,6 +22,7 @@ const navLinks = [
 const NavigationHeader = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -80,6 +83,13 @@ const NavigationHeader = () => {
               </motion.div>
             ))}
             
+            {/* Role Toggle — only for logged-in users */}
+            {isAuthenticated && (
+              <motion.div className="ml-2">
+                <RoleToggle />
+              </motion.div>
+            )}
+
             {/* Profile Button */}
             <div className="ml-2">
               <ProfileButton />
