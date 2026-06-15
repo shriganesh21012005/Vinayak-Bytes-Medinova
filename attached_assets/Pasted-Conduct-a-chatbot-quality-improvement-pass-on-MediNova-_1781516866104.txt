@@ -1,0 +1,62 @@
+Conduct a chatbot quality improvement pass on MediNova.
+
+Current issue:
+The chatbot handles emergencies and health-memory questions reasonably well, but many normal health questions fall back to generic responses such as:
+
+"Could you share a bit more detail about what you'd like to know?"
+
+or unrelated templates (e.g. mental health advice for sleepiness).
+
+Examples currently performing poorly:
+- "Should I dance?"
+- "Can I go outside in pollution without a mask?"
+- "I'm feeling sleepy"
+- "How much water should I drink?"
+- "I have a mild headache"
+- "Can I exercise today?"
+- "What foods should I avoid?"
+- "Is walking good for me?"
+
+Goal:
+Review the most common 50 health questions users are likely to ask.
+
+Requirements:
+
+1. Reduce unnecessary fallback responses.
+2. Provide useful general-health guidance when safe.
+3. Continue using HealthMemory where relevant.
+4. Preserve all existing safety protections:
+   - No diagnosis
+   - No prescriptions
+   - No replacing a doctor
+   - Emergency detection must remain unchanged
+5. Ensure responses are context-aware:
+   - If user asks about allergies, medications, conditions, restrictions, use HealthMemory.
+   - If user asks a general wellness question, answer it directly instead of requesting more details.
+6. Remove cases where unrelated templates are returned.
+   Example:
+   - Sleepiness should not trigger mental-health advice.
+   - Pollution questions should not trigger generic clarification requests.
+7. Add automated test cases covering:
+   - allergies
+   - medications
+   - sleep
+   - exercise
+   - diet
+   - hydration
+   - pollution
+   - fever
+   - headache
+   - dizziness
+   - emergency symptoms
+   - diagnosis requests
+   - prescription requests
+
+Before making changes:
+- Trace the exact response path.
+- Identify where generic fallback responses are being selected.
+- Explain the root causes.
+
+After changes:
+- Show what files were modified.
+- Show example responses before vs after.
