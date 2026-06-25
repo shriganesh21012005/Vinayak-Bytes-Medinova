@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://medinova-api.onrender.com/api/:path*"
+      "destination": "https://vinayak-bytes-medinova-zw6z.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
