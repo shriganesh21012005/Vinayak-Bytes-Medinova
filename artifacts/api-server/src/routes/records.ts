@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
 import mongoose from "mongoose";
 import { requireAuth, type AuthRequest } from "../middlewares/auth";
@@ -45,10 +45,27 @@ function safeOcrSummary(ocr: {
   };
 }
 
+function handleMulterUpload(req: Request, res: Response, next: NextFunction) {
+  upload.single("file")(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ error: "File too large. Maximum size is 10 MB." });
+      } else {
+        res.status(400).json({ error: `Upload error: ${err.message}` });
+      }
+    } else if (err instanceof Error) {
+      res.status(400).json({ error: err.message });
+    } else {
+      res.status(400).json({ error: "Upload failed." });
+    }
+  });
+}
+
 router.post(
   "/records/upload",
   requireAuth,
-  upload.single("file"),
+  handleMulterUpload,
   async (req: AuthRequest, res) => {
     if (!req.file) {
       res.status(400).json({ error: "No file provided." });
