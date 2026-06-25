@@ -14,19 +14,25 @@ app.set("trust proxy", 1);
 
 app.use(helmet());
 
-const VERCEL_FRONTEND = "https://vinayak-bytes-medinovarepotrackedbyvercel-gtq0er7e4.vercel.app";
+const VERCEL_PATTERN = /^https:\/\/vinayak-bytes-medinovarepotrackedbyvercel[a-z0-9-]*\.vercel\.app$/;
+const LOCAL_ORIGINS = new Set(["http://localhost:5000", "http://localhost:19579"]);
 
-const allowedOrigins: string[] | true = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : [
-      VERCEL_FRONTEND,
-      "http://localhost:5000",
-      "http://localhost:19579",
-    ];
+function isAllowedOrigin(origin: string): boolean {
+  if (LOCAL_ORIGINS.has(origin)) return true;
+  if (VERCEL_PATTERN.test(origin)) return true;
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).includes(origin);
+  }
+  return false;
+}
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin not allowed — ${origin}`));
+    },
     credentials: true,
   })
 );
