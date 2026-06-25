@@ -399,7 +399,6 @@ const PathoLab = () => {
                     </CardHeader>
                     <CardContent>
                       <RecordUploader
-                        accessToken={token}
                         onUploaded={fetchRecords}
                       />
                     </CardContent>

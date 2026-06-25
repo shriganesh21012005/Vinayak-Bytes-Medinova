@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, Image, X, Loader2, Shield, CheckCircle, Brain } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -23,11 +24,11 @@ interface UploadResult {
 }
 
 interface RecordUploaderProps {
-  accessToken: string;
   onUploaded: () => void;
 }
 
-export default function RecordUploader({ accessToken, onUploaded }: RecordUploaderProps) {
+export default function RecordUploader({ onUploaded }: RecordUploaderProps) {
+  const { accessToken, refreshAccessToken } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>({ phase: 'idle' });
   const [dragging, setDragging] = useState(false);
@@ -56,13 +57,19 @@ export default function RecordUploader({ accessToken, onUploaded }: RecordUpload
     const { file } = state;
     setState({ phase: 'uploading', file, progress: 0 });
 
+    const token = accessToken ?? await refreshAccessToken();
+    if (!token) {
+      setState({ phase: 'error', message: 'Session expired. Please log in again.' });
+      return;
+    }
+
     const form = new FormData();
     form.append('file', file);
 
     try {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/records/upload');
-      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.withCredentials = true;
 
       xhr.upload.onprogress = (e) => {

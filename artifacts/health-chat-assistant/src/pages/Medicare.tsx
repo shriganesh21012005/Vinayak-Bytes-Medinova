@@ -9,6 +9,7 @@ import { Search, Upload, ShoppingCart, ArrowRight } from 'lucide-react';
 import MouseFollower from '@/components/MouseFollower';
 import RecordUploader from '@/components/RecordUploader';
 import { useAuth } from '@/contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
 const popularMedicines = [
   { id: 1, name: "Aspirin", description: "Pain reliever", price: 199, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400&h=400" },
@@ -23,17 +24,7 @@ const Medicare = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<Array<{ id: number, name: string, price: number, quantity: number }>>([]);
   const { toast } = useToast();
-  const { accessToken, refreshAccessToken } = useAuth();
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const getToken = async () => {
-      let t = accessToken;
-      if (!t) t = await refreshAccessToken();
-      setToken(t);
-    };
-    getToken();
-  }, [accessToken, refreshAccessToken]);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     document.title = "Medicare - HealthCare";
@@ -96,16 +87,15 @@ const Medicare = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {token ? (
+              {isAuthenticated ? (
                 <RecordUploader
-                  accessToken={token}
                   onUploaded={() => {
                     toast({ title: "Prescription processed", description: "Your health memory has been updated." });
                   }}
                 />
               ) : (
                 <p className="text-sm text-white/50 text-center py-4">
-                  Please <a href="/login" className="text-medical underline">log in</a> to upload a prescription.
+                  Please <Link to="/login" className="text-medical underline">log in</Link> to upload a prescription.
                 </p>
               )}
             </CardContent>
