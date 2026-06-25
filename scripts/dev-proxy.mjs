@@ -1,28 +1,38 @@
 import http from "node:http";
 import net from "node:net";
 
-const TARGET = 19579;
+const VITE_PORT = 19579;
+const API_PORT = 8080;
 const PORT = 5000;
 
-const server = http.createServer((req, res) => {
+function forward(req, res, targetPort) {
   const opts = {
     hostname: "localhost",
-    port: TARGET,
+    port: targetPort,
     path: req.url,
     method: req.method,
-    headers: { ...req.headers, host: `localhost:${TARGET}` },
+    headers: { ...req.headers, host: `localhost:${targetPort}` },
   };
   const proxy = http.request(opts, (pr) => {
     res.writeHead(pr.statusCode ?? 502, pr.headers);
     pr.pipe(res, { end: true });
   });
-  proxy.on("error", () => res.destroy());
+  proxy.on("error", (err) => {
+    console.error(`Proxy error (→${targetPort}):`, err.message);
+    if (!res.headersSent) res.writeHead(502);
+    res.end();
+  });
   req.pipe(proxy, { end: true });
+}
+
+const server = http.createServer((req, res) => {
+  const isApi = req.url?.startsWith("/api");
+  forward(req, res, isApi ? API_PORT : VITE_PORT);
 });
 
 // WebSocket tunnel (needed for Vite HMR)
 server.on("upgrade", (req, socket, head) => {
-  const conn = net.connect(TARGET, "localhost", () => {
+  const conn = net.connect(VITE_PORT, "localhost", () => {
     const lines = [
       `${req.method} ${req.url} HTTP/1.1`,
       ...Object.entries(req.headers).map(([k, v]) => `${k}: ${v}`),
@@ -47,5 +57,5 @@ server.on("error", (err) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`dev-proxy: ${PORT} → ${TARGET}`);
+  console.log(`dev-proxy: ${PORT} → /api:${API_PORT}, *:${VITE_PORT}`);
 });
