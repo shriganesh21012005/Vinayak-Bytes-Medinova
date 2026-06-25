@@ -14,9 +14,15 @@ app.set("trust proxy", 1);
 
 app.use(helmet());
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+const VERCEL_FRONTEND = "https://vinayak-bytes-medinovarepotrackedbyvercel-gtq0er7e4.vercel.app";
+
+const allowedOrigins: string[] | true = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : true;
+  : [
+      VERCEL_FRONTEND,
+      "http://localhost:5000",
+      "http://localhost:19579",
+    ];
 
 app.use(
   cors({

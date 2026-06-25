@@ -4,6 +4,7 @@ import { Upload, FileText, Image, X, Loader2, Shield, CheckCircle, Brain } from 
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE } from '@/lib/apiBase';
 
 const ACCEPTED = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -68,7 +69,7 @@ export default function RecordUploader({ onUploaded }: RecordUploaderProps) {
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/records/upload');
+      xhr.open('POST', `${API_BASE}/records/upload`);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.withCredentials = true;
 

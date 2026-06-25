@@ -102,7 +102,7 @@ export default function RecordCard({ record, accessToken, onDelete }: RecordCard
   }
 
   function openFile() {
-    window.open(`/api/records/${record._id}/file`, '_blank');
+    window.open(`${API_BASE}/records/${record._id}/file`, '_blank');
   }
 
   return (
