@@ -4,10 +4,11 @@ import NavigationHeader from '@/components/NavigationHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Search, Upload, ShoppingCart, ArrowRight } from 'lucide-react';
+import { Search, Upload, ShoppingCart, ArrowRight } from 'lucide-react';
 import MouseFollower from '@/components/MouseFollower';
+import RecordUploader from '@/components/RecordUploader';
+import { useAuth } from '@/contexts/AuthContext';
 
 const popularMedicines = [
   { id: 1, name: "Aspirin", description: "Pain reliever", price: 199, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400&h=400" },
@@ -21,8 +22,18 @@ const popularMedicines = [
 const Medicare = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<Array<{ id: number, name: string, price: number, quantity: number }>>([]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const { accessToken, refreshAccessToken } = useAuth();
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getToken = async () => {
+      let t = accessToken;
+      if (!t) t = await refreshAccessToken();
+      setToken(t);
+    };
+    getToken();
+  }, [accessToken, refreshAccessToken]);
 
   useEffect(() => {
     document.title = "Medicare - HealthCare";
@@ -45,13 +56,6 @@ const Medicare = () => {
       setCart([...cart, { id, name, price, quantity: 1 }]);
     }
     toast({ title: "Added to cart", description: `${name} added to your cart` });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-      toast({ title: "Prescription uploaded", description: "Our pharmacist will review your prescription shortly." });
-    }
   };
 
   return (
@@ -92,36 +96,18 @@ const Medicare = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center">
-                <div className="w-full max-w-md">
-                  <label
-                    htmlFor="prescription-upload"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-3 text-muted-foreground" />
-                      <p className="mb-2 text-sm text-muted-foreground">
-                        <span className="font-semibold">Click to upload</span> or drag and drop
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        PDF, JPG or PNG (MAX. 10MB)
-                      </p>
-                    </div>
-                    <input id="prescription-upload" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
-                  </label>
-                </div>
-                {selectedFile && (
-                  <div className="mt-4 p-2 bg-medical/10 rounded w-full max-w-md">
-                    <p className="text-sm font-medium">{selectedFile.name}</p>
-                  </div>
-                )}
-                <div className="mt-6">
-                  <Button>
-                    Submit Prescription
-                    <Upload className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+              {token ? (
+                <RecordUploader
+                  accessToken={token}
+                  onUploaded={() => {
+                    toast({ title: "Prescription processed", description: "Your health memory has been updated." });
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-white/50 text-center py-4">
+                  Please <a href="/login" className="text-medical underline">log in</a> to upload a prescription.
+                </p>
+              )}
             </CardContent>
           </Card>
         </motion.div>
