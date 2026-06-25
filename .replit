@@ -33,7 +33,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
+args = "cd artifacts/api-server && pnpm run build && PORT=8080 node --enable-source-maps ./dist/index.mjs"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -68,6 +68,10 @@ externalPort = 8081
 [[ports]]
 localPort = 19579
 externalPort = 3001
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [userenv]
 
