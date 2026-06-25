@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, X, Send, ChevronUp, Sparkles, Trash2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,6 @@ const WELCOME_MESSAGE: Message = {
   role: 'assistant',
   content: "Hi! I'm your MediNova AI health assistant. I can answer general health questions and, if you've uploaded medical records, I'll factor your personal health profile into my responses.\n\nHow can I help you today?",
 };
-
-const API_BASE = '/api';
 
 const ChatAssistant = () => {
   const { isAuthenticated, accessToken, refreshAccessToken } = useAuth();

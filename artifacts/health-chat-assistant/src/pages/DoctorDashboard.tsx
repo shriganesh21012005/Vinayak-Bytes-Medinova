@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 import { motion } from 'framer-motion';
 import {
   User, AlertTriangle, Activity, Pill, ShieldAlert,
@@ -56,7 +57,7 @@ export default function DoctorDashboard() {
   useEffect(() => {
     if (!accessToken) return;
     setLoading(true);
-    fetch('/api/clinical-summary', {
+    fetch(`${API_BASE}/clinical-summary`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then(r => r.json())

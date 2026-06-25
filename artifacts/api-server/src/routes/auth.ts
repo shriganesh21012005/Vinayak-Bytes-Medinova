@@ -18,8 +18,8 @@ function hashToken(token: string): string {
 function setRefreshCookie(res: Response, token: string): void {
   res.cookie("refreshToken", token, {
     httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     maxAge: REFRESH_MAX_AGE_MS,
     path: "/api/auth",
   });
@@ -28,8 +28,8 @@ function setRefreshCookie(res: Response, token: string): void {
 function clearRefreshCookie(res: Response): void {
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     path: "/api/auth",
   });
 }

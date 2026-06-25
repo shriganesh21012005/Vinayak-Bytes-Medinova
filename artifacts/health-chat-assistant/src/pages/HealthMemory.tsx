@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 import { motion } from 'framer-motion';
 import {
   Brain, AlertTriangle, Activity, Pill, Syringe,
@@ -310,7 +311,7 @@ const HealthMemoryPage = () => {
       const token = await getToken();
       if (!token) { setError('Please log in to view your health memory.'); return; }
 
-      const res = await fetch('/api/memory', {
+      const res = await fetch(`${API_BASE}/memory`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });

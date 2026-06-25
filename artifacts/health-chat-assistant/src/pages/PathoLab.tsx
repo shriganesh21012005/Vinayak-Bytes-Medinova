@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 import { motion } from 'framer-motion';
 import NavigationHeader from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -143,7 +144,7 @@ const PathoLab = () => {
       if (!token) token = await refreshAccessToken();
       if (!token) { setRecordsError('Session expired. Please log in again.'); return; }
 
-      const res = await fetch('/api/records', {
+      const res = await fetch(`${API_BASE}/records`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });

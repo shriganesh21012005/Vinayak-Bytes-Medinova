@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '@/lib/apiBase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -89,7 +90,7 @@ export default function RecordCard({ record, accessToken, onDelete }: RecordCard
     if (!confirm(`Delete "${record.originalFileName}"?`)) return;
     setDeleting(true);
     try {
-      await fetch(`/api/records/${record._id}`, {
+      await fetch(`${API_BASE}/records/${record._id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` },
         credentials: 'include',
