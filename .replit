@@ -33,7 +33,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/api-server && pnpm run build && PORT=8080 node --enable-source-maps ./dist/index.mjs"
+args = "pnpm --filter @workspace/api-server run dev"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -45,7 +45,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "fuser -k 5000/tcp 19579/tcp 2>/dev/null || true; pnpm --filter @workspace/health-chat-assistant run dev & node scripts/dev-proxy.mjs"
+args = "pnpm --filter @workspace/health-chat-assistant run dev"
 waitForPort = 5000
 
 [agent]
@@ -60,14 +60,6 @@ timeoutMs = 20000
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
 
 [[ports]]
 localPort = 19579
