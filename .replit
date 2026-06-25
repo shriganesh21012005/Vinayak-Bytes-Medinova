@@ -45,7 +45,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/health-chat-assistant run dev & node scripts/dev-proxy.mjs"
+args = "fuser -k 5000/tcp 19579/tcp 2>/dev/null || true; pnpm --filter @workspace/health-chat-assistant run dev & node scripts/dev-proxy.mjs"
 waitForPort = 5000
 
 [agent]
@@ -62,10 +62,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
 localPort = 8081
 externalPort = 8081
 
@@ -78,8 +74,6 @@ externalPort = 3001
 [userenv.shared]
 ENABLE_OPENAI = "true"
 AI_PROVIDER = "openai"
-JWT_ACCESS_SECRET = "9eb7b94d77020997ad132659d9c20b0d898e2dd04973e8bfdfb70059b1b8c32a0bbe18b2601359322a952ab60d2e1d68"
-JWT_REFRESH_SECRET = "eddd76e5f2402c21e9fd61944e3ea2db49719be85c1754f35e3066923519a3b211b4e7425e3c42976217ac696c17a2c0"
 PORT = "8080"
 
 [nix]
