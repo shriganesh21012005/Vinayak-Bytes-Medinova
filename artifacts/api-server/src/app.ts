@@ -14,9 +14,13 @@ app.set("trust proxy", 1);
 
 app.use(helmet());
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : true;
+
 app.use(
   cors({
-    origin: true,
+    origin: allowedOrigins,
     credentials: true,
   })
 );
